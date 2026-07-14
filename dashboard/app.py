@@ -1,55 +1,72 @@
+# dashboard/app.py
 import streamlit as st
 import pandas as pd
+import os
 
 st.set_page_config(page_title="BBD - Prospect Intelligence", layout="wide")
 
-st.title("🎯 BBD - Prospect Intelligence V1 (Massif des Bauges)")
-st.caption("Moteur intelligent de détection de prospects PAC")
+st.title("🎯 BBD - Prospect Intelligence V1")
+st.caption("Massif des Bauges — Prospection Pompes à Chaleur")
 
-# Charger les données depuis processed/
 @st.cache_data
 def load_data():
-    # Simulation des données issues du script de processed
-    data = {
-        "nom_commune": ["Bellecombe-en-Bauges", "Doucy-en-Bauges", "La Motte-en-Bauges", "Lescheraines"],
-        "adresse": ["12 Rue du Centre", "5 Chef Lieu", "18 Route des Bauges", "2 Place de l'Église"],
-        "annee_construction": [1985, 1992, 2008, 1974],
-        "surface_m2": [120, 95, 110, 140],
-        "chauffage_probable": ["fioul", "gaz", "electrique", "fioul"],
-        "score_bbd": [98, 94, 46, 100],
-        "lat": [45.741, 45.722, 45.701, 45.711],
-        "lon": [6.142, 6.182, 6.128, 6.155]
-    }
-    return pd.DataFrame(data)
+    path = "data/processed/maisons_qualifiees.csv"
+    if os.path.exists(path):
+        return pd.read_csv(path)
+    return pd.DataFrame()
 
 df = load_data()
 
-# Filtres latéraux
-st.sidebar.header("Filtres")
-score_min = st.sidebar.slider("Score BBD Minimum", 0, 100, 80)
+if df.empty:
+    st.warning("⚠️ Aucune donnée qualifiée disponible. Lance d'abord `python data/process_data.py`.")
+else:
+    # Sidebar - Filtres
+    st.sidebar.header("🔍 Filtres Prospection")
+    
+    communes_dispo = ["Toutes"] + list(df["nom_commune"].unique())
+    selected_commune = st.sidebar.selectbox("Commune", communes_dispo)
+    
+    min_score = st.sidebar.slider("Score BBD Minimum", 0, 100, 75)
 
-# Filtrer le DataFrame
-df_filtered = df[df["score_bbd"] >= score_min].sort_values(by="score_bbd", ascending=False)
+    # Filtrage
+    df_filtered = df[df["score_bbd"] >= min_score]
+    if selected_commune != "Toutes":
+        df_filtered = df_filtered[df_filtered["nom_commune"] == selected_commune]
 
-# Métriques rapides (Module 11)
-col1, col2, col3 = st.columns(3)
-col1.metric("Communes Détectées", len(df["nom_commune"].unique()))
-col2.metric("Maisons Qualifiées (>80)", len(df[df["score_bbd"] >= 80]))
-col3.metric("Prospects prioritaires", len(df_filtered))
+    # KPI / Métriques (Module 11)
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Communes", len(df["nom_commune"].unique()))
+    col2.metric("Total Maisons", len(df))
+    col3.metric("Prospects Prioritaires (≥75)", len(df[df["score_bbd"] >= 75]))
+    col4.metric("Sélectionnés", len(df_filtered))
 
-st.subheader("📋 Liste des maisons qualifiées pour Gaël")
+    st.divider()
 
-# Affichage du tableau avec lien Street View direct
-for idx, row in df_filtered.iterrows():
-    with st.expander(f"🏠 {row['adresse']}, {row['nom_commune']} — Score BBD : {row['score_bbd']}/100"):
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            st.write(f"**Année de construction :** {row['annee_construction']}")
-            st.write(f"**Surface estimée :** {row['surface_m2']} m²")
-            st.write(f"**Chauffage probable :** {row['chauffage_probable'].upper()}")
-        with c2:
-            google_maps_url = f"https://www.google.com/maps/search/?api=1&query={row['lat']},{row['lon']}"
-            st.markdown(f"[🔍 Ouvrir Google Maps / Street View]({google_maps_url})", unsafe_allow_html=True)
-            if st.button(f"Transmettre à Gaël ({row['adresse']})"):
-                st.success("Dossier transmis !")
+    # Liste des fiches prospects (Module 7)
+    st.subheader(f"📋 Fiches Prospects Qualifiés ({len(df_filtered)})")
 
+    for idx, row in df_filtered.iterrows():
+        score = row['score_bbd']
+        badge_color = "🔴" if score < 50 else ("🟠" if score < 80 else "🟢")
+        
+        with st.expander(f"{badge_color} Score {score}/100 — {row['adresse']} ({row['nom_commune']})"):
+            c1, c2, c3 = st.columns([2, 2, 1])
+            
+            with c1:
+                st.write(f"**Commune :** {row['nom_commune']}")
+                st.write(f"**Code Postal :** {row['code_post']}")
+                st.write(f"**Chauffage estimé :** {str(row['type_chauffage_probable']).upper()}")
+
+            with c2:
+                st.write(f"**Année constr. estimée :** {row['annee_construction']}")
+                st.write(f"**Surface estimée :** {row['surface_m2']} m²")
+                st.write(f"**Statut :** {row.get('statut', 'À analyser')}")
+
+            with c3:
+                # Lien direct Google Street View (Module 6)
+                lat, lon = row['lat'], row['lon']
+                gmaps_url = f"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat},{lon}"
+                st.markdown(f"[🔍 Street View]({gmaps_url})", unsafe_allow_html=True)
+                
+                if st.button("Transmettre à Gaël", key=f"btn_{idx}"):
+                    st.success("Transmis !")
