@@ -7,6 +7,7 @@ import { ScoreBadge } from "../components/Widgets";
 import HousesMap from "../components/HousesMap";
 import HouseSheet from "../components/HouseSheet";
 import MairieCard from "../components/MairieCard";
+import EcosystemCard from "../components/EcosystemCard";
 import { ArrowLeft, Sparkles, Mountain, Home as HomeIcon, Euro, Calendar,
          MapPin, Loader2, ExternalLink, Radar, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -178,8 +179,9 @@ export default function CommuneDetail() {
         </div>
 
         {/* Mairie (Module 8) */}
-        <div className="mb-8">
+        <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <MairieCard codeInsee={codeInsee} />
+          <EcosystemCard codeInsee={codeInsee} />
         </div>
 
         {/* Breakdown score */}

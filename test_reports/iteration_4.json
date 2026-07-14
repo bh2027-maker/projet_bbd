@@ -1,0 +1,25 @@
+{
+  "summary": "Phase 4 fully validated end-to-end (backend 8/8 + frontend all flows OK). Backend: GET /communes/74138/ecosysteme returns 7 expected categories (artisans_btp, commerces_proximite, restauration, auto_moto, bricolage_agri, sante, associations_sport_culture), total>0 for Gruffy, each entity has {nom,siret,naf,activite_libelle,commune}; second call returns cached:true; unknown INSEE 00000 → 404; POST /enrichment/start returns status started|already_running with progress; GET /enrichment/status returns full shape {running,total,done,current,results,started_at,finished_at}. Enrichment already ran previously (results present). Multiple houses across 73036/73013/73003/73056/73178/73101 have bdtopo_matched=true and bdtopo_year set; an old house (bdtopo_year<1948) has score>=80 as required; GET /houses/{id} returns bdtopo_matched, bdtopo_year and start_date on enriched houses. Frontend: dashboard data-testid=discover-all-wrap contains 2 children (DiscoverAllButton + EnrichButton), EnrichButton currently shows enrich-done card ('14 communes · 2281 vraies dates'). Commune 74138 shows ecosystem-card with 3 categories, clicking eco-toggle-artisans_btp reveals 24 eco-entity-{siret} rows each showing name + activité + commune (+ adresse), collapse hides them. Pipeline page: pipeline-toggle-filters reveals pipeline-filters section containing 7 filter-status-* buttons, 5 filter-commune-* buttons (after load-top), filter-score-min, filter-surface-min sliders, and filter-reset. CSV button counter updates live: '(0)' → '(20)' after load-top. pipeline-csv-btn downloads prospects-BBD-2026-07-14.csv with UTF-8 BOM, ';' separator, and all 17 expected columns in order (id;commune;code_insee;score;statut;type;surface_hab_m2;surface_sol_m2;anciennete;proba_chauffage_fossile_pct;contact_nom;contact_tel;contact_email;lat;lon;gmaps;notes). filter-reset restores full list.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase4.py",
+    "/app/test_reports/pytest/phase4_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py now 534 lines with 3 module-level state dicts and route + background task orchestration; strongly consider splitting into routes/ecosysteme.py, routes/enrichment.py, routes/discovery.py and moving _discovery_state/_enrichment_state into a small state module (or Mongo) — will break under multi-worker uvicorn.",
+    "services/bdtopo.match_houses_to_bdtopo is O(H*B) nearest-neighbor with no spatial index; fine for ~5k buildings but flagged if bbox radius or house count grows.",
+    "services/sirene.fetch_ecosysteme launches ~48 SIRENE HTTP calls sequentially per category (parallelized within category but not across categories); consider one asyncio.gather across all NAF codes at once with a semaphore.",
+    "SIRENE cache stored on the commune document — no TTL, will drift; add ecosysteme_at timestamp and a refresh flag (already supported via ?refresh=true, but there is no UI to trigger it).",
+    "Pipeline CSV export in the frontend duplicates the column list vs any potential backend export; consider a backend endpoint /api/pipeline/csv to keep column contract in one place.",
+    "EnrichButton polls every 3s indefinitely while running; cleanup on unmount is missing (only 'stop' guard covers the first fetch, not the setTimeout chain — potential memory leak if user navigates away mid-run).",
+    "In Pipeline.jsx the surface filter uses h.surface_habitable_estimee_m2 which is undefined on some houses coming from top mode? Value is compared with < which will always be false for undefined — worth defaulting to 0 to make filter semantics explicit."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase4.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100%"},
+  "seed_data_creation": "None. No mutations performed (enrichment already had completed prior to this run).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Enrichment finished state persists (14 communes, 2281 real construction dates). Gruffy 74138 ecosystem is cached with categories artisans_btp (24), commerces_proximite, restauration visible. Pipeline hot_prospects is empty (0) until user promotes houses; use pipeline-load-top to populate the table (20 highest-score houses across all communes). CSV export column order is stable — reuse the same list if regression-testing."
+}

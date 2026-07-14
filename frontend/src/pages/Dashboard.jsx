@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import { ScoreBadge, KpiCard } from "../components/Widgets";
 import CommuneMap from "../components/CommuneMap";
 import DiscoverAllButton from "../components/DiscoverAllButton";
+import EnrichButton from "../components/EnrichButton";
 import { Search, TrendingUp, Home as HomeIcon, Target, Map as MapIcon } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
@@ -90,9 +91,10 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Discover All (Module 2 en masse) */}
-        <div className="mb-6" data-testid="discover-all-wrap">
+        {/* Discover All (Module 2 en masse) + Enrich BD TOPO */}
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="discover-all-wrap">
           <DiscoverAllButton onRefresh={load} />
+          <EnrichButton onRefresh={load} />
         </div>
 
         {/* Carte */}

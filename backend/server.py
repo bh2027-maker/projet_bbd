@@ -20,6 +20,8 @@ from services.overpass import fetch_buildings
 from services.house_scoring import score_maison, STATUSES, STATUS_LABELS
 from services.annuaire import fetch_mairie
 from services.pdf_tour import build_tour_pdf
+from services.bdtopo import fetch_bdtopo, match_houses_to_bdtopo, compute_bbox
+from services.sirene import fetch_ecosysteme
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -338,6 +340,115 @@ async def tour_pdf(payload: TourRequest):
             "Content-Disposition": f'attachment; filename="feuille-de-route-BBD-{datetime.now().strftime("%Y%m%d")}.pdf"'
         },
     )
+
+
+# ---------- Module 9 : écosystème local ----------
+@api_router.get("/communes/{code_insee}/ecosysteme")
+async def get_ecosysteme(code_insee: str, refresh: bool = False):
+    """Retourne les acteurs locaux (SIRENE), avec cache MongoDB."""
+    commune = await db.communes.find_one({"code_insee": code_insee})
+    if not commune:
+        raise HTTPException(404, "Commune introuvable")
+    if not refresh and commune.get("ecosysteme"):
+        return {"cached": True, **commune["ecosysteme"]}
+    try:
+        eco = await fetch_ecosysteme(code_insee)
+    except Exception as e:  # noqa
+        raise HTTPException(502, f"SIRENE indisponible : {e}")
+    await db.communes.update_one({"code_insee": code_insee}, {"$set": {"ecosysteme": eco}})
+    return {"cached": False, **eco}
+
+
+# ---------- Enrichissement BD TOPO IGN (dates réelles) ----------
+async def _enrich_commune_bdtopo(commune: dict) -> dict:
+    houses = [h async for h in db.maisons.find({"code_insee": commune["code_insee"]})]
+    if not houses:
+        return {"code_insee": commune["code_insee"], "nom": commune["nom"],
+                "matched": 0, "enriched_with_date": 0}
+    bbox = compute_bbox(commune["lat"], commune["lon"], radius_km=4.0)
+    bdtopo = await fetch_bdtopo(bbox, limit=5000)
+    matches = match_houses_to_bdtopo(houses, bdtopo, tolerance_m=15.0)
+    matched = 0
+    with_date = 0
+    for h, b in matches:
+        if not b:
+            continue
+        matched += 1
+        updates = {"bdtopo_matched": True}
+        if b.get("year"):
+            updates["start_date"] = str(b["year"])
+            updates["bdtopo_year"] = b["year"]
+            with_date += 1
+        if b.get("logements") is not None:
+            updates["bdtopo_logements"] = b["logements"]
+        if b.get("etages") is not None:
+            updates["bdtopo_etages"] = b["etages"]
+            if not h.get("levels"):
+                updates["levels"] = b["etages"]
+        if b.get("hauteur_m") is not None:
+            updates["bdtopo_hauteur_m"] = b["hauteur_m"]
+        if b.get("usage"):
+            updates["bdtopo_usage"] = b["usage"]
+
+        # Re-compute score with the new data
+        merged = {**h, **updates}
+        new_score = score_maison(merged, commune)
+        updates.update(new_score)
+
+        await db.maisons.update_one({"id": h["id"]}, {"$set": updates})
+    return {
+        "code_insee": commune["code_insee"], "nom": commune["nom"],
+        "houses": len(houses), "matched": matched, "enriched_with_date": with_date,
+    }
+
+
+# State for enrichment background job
+_enrichment_state = {
+    "running": False, "total": 0, "done": 0, "current": None,
+    "results": [], "started_at": None, "finished_at": None,
+}
+
+
+async def _run_enrich_all():
+    _enrichment_state["running"] = True
+    _enrichment_state["started_at"] = datetime.now(timezone.utc).isoformat()
+    _enrichment_state["results"] = []
+    todo = []
+    async for c in db.communes.find({}):
+        cnt = await db.maisons.count_documents({"code_insee": c["code_insee"]})
+        if cnt > 0:
+            todo.append(_clean(dict(c)))
+    _enrichment_state["total"] = len(todo)
+    _enrichment_state["done"] = 0
+    for c in todo:
+        _enrichment_state["current"] = c["nom"]
+        try:
+            res = await _enrich_commune_bdtopo(c)
+            _enrichment_state["results"].append({**res, "ok": True})
+        except Exception as e:  # noqa
+            _enrichment_state["results"].append({
+                "code_insee": c["code_insee"], "nom": c["nom"],
+                "ok": False, "error": str(e)[:150],
+            })
+        _enrichment_state["done"] += 1
+        await asyncio.sleep(0.3)
+    _enrichment_state["current"] = None
+    _enrichment_state["running"] = False
+    _enrichment_state["finished_at"] = datetime.now(timezone.utc).isoformat()
+
+
+@api_router.post("/enrichment/start")
+async def trigger_enrich_all():
+    if _enrichment_state["running"]:
+        return {"status": "already_running", "progress": _enrichment_state}
+    asyncio.create_task(_run_enrich_all())
+    await asyncio.sleep(0.2)
+    return {"status": "started", "progress": _enrichment_state}
+
+
+@api_router.get("/enrichment/status")
+async def enrich_status():
+    return _enrichment_state
 
 
 app.include_router(api_router)

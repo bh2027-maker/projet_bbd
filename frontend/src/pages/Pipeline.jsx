@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchPipeline, statusColor, generateTourPdf, api } from "../lib/api";
 import Header from "../components/Header";
 import { ScoreBadge } from "../components/Widgets";
-import { Layers, Flame, ArrowLeft, ExternalLink, FileDown, Loader2 } from "lucide-react";
+import { Layers, Flame, ArrowLeft, ExternalLink, FileDown, Loader2, Filter, FileSpreadsheet } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Checkbox } from "../components/ui/checkbox";
 import { toast } from "sonner";
@@ -16,10 +16,32 @@ export default function Pipeline() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [topMode, setTopMode] = useState(false);
   const [topHouses, setTopHouses] = useState([]);
+  // Filters
+  const [filterStatuses, setFilterStatuses] = useState(new Set());
+  const [filterCommunes, setFilterCommunes] = useState(new Set());
+  const [filterScoreMin, setFilterScoreMin] = useState(0);
+  const [filterSurfaceMin, setFilterSurfaceMin] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     (async () => setData(await fetchPipeline()))();
   }, []);
+
+  const rawList = topMode ? topHouses : (data?.hot_prospects || []);
+  const activeList = useMemo(() => {
+    return rawList.filter((h) => {
+      if (filterStatuses.size > 0 && !filterStatuses.has(h.status)) return false;
+      if (filterCommunes.size > 0 && !filterCommunes.has(h.commune_nom)) return false;
+      if (h.score < filterScoreMin) return false;
+      if (h.surface_habitable_estimee_m2 < filterSurfaceMin) return false;
+      return true;
+    });
+  }, [rawList, filterStatuses, filterCommunes, filterScoreMin, filterSurfaceMin]);
+
+  const availableCommunes = useMemo(
+    () => [...new Set(rawList.map((h) => h.commune_nom))].sort(),
+    [rawList]
+  );
 
   const toggle = (id) => {
     setSelected((prev) => {
@@ -30,7 +52,71 @@ export default function Pipeline() {
     });
   };
 
-  const activeList = topMode ? topHouses : (data?.hot_prospects || []);
+  const toggleStatus = (s) => {
+    setFilterStatuses((prev) => {
+      const n = new Set(prev);
+      n.has(s) ? n.delete(s) : n.add(s);
+      return n;
+    });
+  };
+  const toggleCommune = (c) => {
+    setFilterCommunes((prev) => {
+      const n = new Set(prev);
+      n.has(c) ? n.delete(c) : n.add(c);
+      return n;
+    });
+  };
+  const resetFilters = () => {
+    setFilterStatuses(new Set());
+    setFilterCommunes(new Set());
+    setFilterScoreMin(0);
+    setFilterSurfaceMin(0);
+  };
+
+  const exportCsv = () => {
+    if (activeList.length === 0) {
+      toast.error("Rien à exporter");
+      return;
+    }
+    const cols = [
+      "id","commune","code_insee","score","statut","type","surface_hab_m2","surface_sol_m2",
+      "anciennete","proba_chauffage_fossile_pct","contact_nom","contact_tel","contact_email",
+      "lat","lon","gmaps","notes"
+    ];
+    const rows = activeList.map((h) => ({
+      id: h.id,
+      commune: h.commune_nom,
+      code_insee: h.code_insee,
+      score: h.score,
+      statut: (data?.labels?.[h.status]) || h.status,
+      type: h.type_label,
+      surface_hab_m2: h.surface_habitable_estimee_m2,
+      surface_sol_m2: h.surface_sol_m2,
+      anciennete: h.age_label,
+      proba_chauffage_fossile_pct: h.proba_chauffage_fossile_pct,
+      contact_nom: h.contact_nom || "",
+      contact_tel: h.contact_tel || "",
+      contact_email: h.contact_email || "",
+      lat: h.lat,
+      lon: h.lon,
+      gmaps: `https://www.google.com/maps/search/?api=1&query=${h.lat},${h.lon}`,
+      notes: (h.notes || "").replace(/"/g, '""'),
+    }));
+    const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csv = [
+      cols.join(";"),
+      ...rows.map((r) => cols.map((c) => esc(r[c])).join(";")),
+    ].join("\n");
+    // BOM for Excel FR
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `prospects-BBD-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(`${activeList.length} prospects exportés en CSV`);
+  };
 
   const selectAllVisible = () => {
     setSelected(new Set(activeList.map((h) => h.id)));
@@ -174,8 +260,97 @@ export default function Pipeline() {
                   ? <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> PDF…</>
                   : <><FileDown className="w-3.5 h-3.5 mr-2" /> Feuille de route PDF ({selected.size})</>}
               </Button>
+              <Button size="sm"
+                onClick={exportCsv}
+                data-testid="pipeline-csv-btn"
+                className="bg-slate-700/40 border border-slate-600 text-slate-200 hover:bg-slate-700">
+                <FileSpreadsheet className="w-3.5 h-3.5 mr-2" /> CSV ({activeList.length})
+              </Button>
+              <Button size="sm" variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                data-testid="pipeline-toggle-filters"
+                className="border-slate-700 text-slate-300 hover:bg-slate-800">
+                <Filter className="w-3.5 h-3.5 mr-2" /> Filtres
+                {(filterStatuses.size + filterCommunes.size + (filterScoreMin>0?1:0) + (filterSurfaceMin>0?1:0)) > 0 && (
+                  <span className="ml-1.5 text-[10px] px-1.5 rounded-sm bg-emerald-500/20 text-emerald-300">
+                    {filterStatuses.size + filterCommunes.size + (filterScoreMin>0?1:0) + (filterSurfaceMin>0?1:0)}
+                  </span>
+                )}
+              </Button>
             </div>
           </div>
+
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-slate-800 space-y-4" data-testid="pipeline-filters">
+              <div>
+                <div className="text-[10.5px] uppercase tracking-wider text-slate-500 mb-2">Statut</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {ORDER.map((s) => {
+                    const on = filterStatuses.has(s);
+                    return (
+                      <button key={s} onClick={() => toggleStatus(s)}
+                        data-testid={`filter-status-${s}`}
+                        className={`text-[10.5px] px-2 py-1 rounded-sm border font-mono-data uppercase tracking-wider transition-colors ${
+                          on ? statusColor(s) : "border-slate-800 text-slate-500 hover:border-slate-600"
+                        }`}>
+                        {data.labels[s]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {availableCommunes.length > 0 && (
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-slate-500 mb-2">
+                    Commune ({availableCommunes.length})
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableCommunes.map((c) => {
+                      const on = filterCommunes.has(c);
+                      return (
+                        <button key={c} onClick={() => toggleCommune(c)}
+                          data-testid={`filter-commune-${c}`}
+                          className={`text-[10.5px] px-2 py-1 rounded-sm border transition-colors ${
+                            on
+                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                              : "border-slate-800 text-slate-400 hover:border-slate-600"
+                          }`}>
+                          {c}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-slate-500 mb-2">
+                    Score min : <span className="text-slate-200 font-mono-data ml-1">{filterScoreMin}</span>
+                  </div>
+                  <input type="range" min="0" max="100" step="5"
+                    value={filterScoreMin}
+                    onChange={(e) => setFilterScoreMin(Number(e.target.value))}
+                    data-testid="filter-score-min"
+                    className="accent-emerald-500 w-full" />
+                </div>
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-slate-500 mb-2">
+                    Surface hab. min : <span className="text-slate-200 font-mono-data ml-1">{filterSurfaceMin} m²</span>
+                  </div>
+                  <input type="range" min="0" max="300" step="10"
+                    value={filterSurfaceMin}
+                    onChange={(e) => setFilterSurfaceMin(Number(e.target.value))}
+                    data-testid="filter-surface-min"
+                    className="accent-emerald-500 w-full" />
+                </div>
+              </div>
+              <button onClick={resetFilters}
+                data-testid="filter-reset"
+                className="text-xs text-slate-400 hover:text-emerald-400 underline">
+                Réinitialiser tous les filtres
+              </button>
+            </div>
+          )}
         </div>
 
         {activeList.length === 0 && (

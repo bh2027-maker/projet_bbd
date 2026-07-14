@@ -70,6 +70,21 @@ export const fetchDiscoveryStatus = async () => {
   return data;
 };
 
+export const startEnrichment = async () => {
+  const { data } = await api.post(`/enrichment/start`);
+  return data;
+};
+
+export const fetchEnrichmentStatus = async () => {
+  const { data } = await api.get(`/enrichment/status`);
+  return data;
+};
+
+export const fetchEcosysteme = async (codeInsee) => {
+  const { data } = await api.get(`/communes/${codeInsee}/ecosysteme`);
+  return data;
+};
+
 export const generateTourPdf = async (houseIds, label) => {
   const response = await api.post(`/tour/pdf`, { house_ids: houseIds, label }, {
     responseType: "blob",
