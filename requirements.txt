@@ -1,0 +1,6 @@
+pandas
+geopandas
+requests
+streamlit
+scikit-learn
+openpyxl
