@@ -85,10 +85,13 @@ export const fetchEcosysteme = async (codeInsee) => {
   return data;
 };
 
-export const generateTourPdf = async (houseIds, label) => {
-  const response = await api.post(`/tour/pdf`, { house_ids: houseIds, label }, {
-    responseType: "blob",
-  });
+export const generateTourPdf = async (houseIds, options = {}) => {
+  const response = await api.post(`/tour/pdf`, {
+    house_ids: houseIds,
+    max_per_day: options.maxPerDay ?? 8,
+    max_km_per_day: options.maxKmPerDay ?? 40,
+    label: options.label,
+  }, { responseType: "blob", timeout: 180000 });
   return response.data;
 };
 

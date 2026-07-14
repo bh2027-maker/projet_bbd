@@ -20,6 +20,7 @@ from services.overpass import fetch_buildings
 from services.house_scoring import score_maison, STATUSES, STATUS_LABELS
 from services.annuaire import fetch_mairie
 from services.pdf_tour import build_tour_pdf
+from services.pdf_tour_v2 import build_tour_pdf_v2
 from services.bdtopo import fetch_bdtopo, match_houses_to_bdtopo, compute_bbox
 from services.sirene import fetch_ecosysteme
 
@@ -311,6 +312,9 @@ class TourRequest(BaseModel):
     house_ids: List[str]
     date: str | None = None
     label: str | None = None
+    max_per_day: int = 8
+    max_km_per_day: float = 40.0
+    include_photos: bool = True
 
 
 @api_router.post("/tour/pdf")
@@ -318,8 +322,8 @@ async def tour_pdf(payload: TourRequest):
     """Génère un PDF de feuille de route pour Gaël à partir d'une liste de maisons."""
     if not payload.house_ids:
         raise HTTPException(400, "Aucune maison sélectionnée")
-    if len(payload.house_ids) > 25:
-        raise HTTPException(400, "Maximum 25 maisons par feuille de route")
+    if len(payload.house_ids) > 50:
+        raise HTTPException(400, "Maximum 50 maisons par feuille de route")
 
     houses = []
     async for d in db.maisons.find({"id": {"$in": payload.house_ids}}):
@@ -328,11 +332,20 @@ async def tour_pdf(payload: TourRequest):
     if not houses:
         raise HTTPException(404, "Aucune maison trouvée pour ces IDs")
 
-    # Preserve requested order? — we optimize inside build_tour_pdf
-    pdf_bytes = build_tour_pdf(houses, {
-        "date": payload.date or datetime.now().strftime("%d/%m/%Y"),
-        "label": payload.label,
-    })
+    # Load communes for revenu_median context
+    codes = list({h["code_insee"] for h in houses})
+    communes = []
+    async for c in db.communes.find({"code_insee": {"$in": codes}}):
+        c.pop("_id", None)
+        communes.append(c)
+
+    pdf_bytes = await build_tour_pdf_v2(
+        houses, communes,
+        {"date": payload.date or datetime.now().strftime("%d/%m/%Y"),
+         "label": payload.label},
+        max_per_day=payload.max_per_day,
+        max_km_per_day=payload.max_km_per_day,
+    )
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",

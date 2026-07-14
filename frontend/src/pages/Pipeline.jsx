@@ -22,6 +22,8 @@ export default function Pipeline() {
   const [filterScoreMin, setFilterScoreMin] = useState(0);
   const [filterSurfaceMin, setFilterSurfaceMin] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
+  const [maxPerDay, setMaxPerDay] = useState(8);
+  const [maxKmPerDay, setMaxKmPerDay] = useState(40);
 
   useEffect(() => {
     (async () => setData(await fetchPipeline()))();
@@ -150,8 +152,10 @@ export default function Pipeline() {
     }
     setPdfLoading(true);
     try {
-      const blob = await generateTourPdf(Array.from(selected),
-                                          `Tournée ${new Date().toLocaleDateString("fr-FR")}`);
+      const blob = await generateTourPdf(Array.from(selected), {
+        maxPerDay, maxKmPerDay,
+        label: `Tournée ${new Date().toLocaleDateString("fr-FR")}`,
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -260,6 +264,21 @@ export default function Pipeline() {
                   ? <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> PDF…</>
                   : <><FileDown className="w-3.5 h-3.5 mr-2" /> Feuille de route PDF ({selected.size})</>}
               </Button>
+              <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 border border-slate-800 rounded-sm px-2 py-1 h-8">
+                <span className="text-slate-500">Max/jour</span>
+                <input type="number" min="1" max="30"
+                  value={maxPerDay}
+                  onChange={(e) => setMaxPerDay(Math.max(1, Number(e.target.value)))}
+                  data-testid="tour-max-per-day"
+                  className="bg-transparent w-10 text-slate-100 text-center outline-none" />
+                <span className="text-slate-700">|</span>
+                <span className="text-slate-500">Km/jour</span>
+                <input type="number" min="5" max="200"
+                  value={maxKmPerDay}
+                  onChange={(e) => setMaxKmPerDay(Math.max(5, Number(e.target.value)))}
+                  data-testid="tour-max-km"
+                  className="bg-transparent w-12 text-slate-100 text-center outline-none" />
+              </div>
               <Button size="sm"
                 onClick={exportCsv}
                 data-testid="pipeline-csv-btn"
