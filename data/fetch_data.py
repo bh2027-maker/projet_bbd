@@ -3,7 +3,6 @@ import requests
 import pandas as pd
 import os
 
-# Codes INSEE ou liste des communes du Massif des Bauges (< 2500 hab)
 COMMUNES_BAUGES = [
     {"nom": "Bellecombe-en-Bauges", "code_insee": "73039", "code_postal": "73340"},
     {"nom": "Doucy-en-Bauges", "code_insee": "73101", "code_postal": "73630"},
@@ -32,8 +31,8 @@ def fetch_communes_metadata():
                 "nom_commune": data.get("nom"),
                 "population": data.get("population"),
                 "code_postal": c['code_postal'],
-                "zone_climatique": "H1", # Le Massif des Bauges est à 100% en zone H1
-                "altitude_moyenne": 850 # Estimation de moyenne montagne
+                "zone_climatique": "H1",
+                "altitude_moyenne": 850
             })
             
     df = pd.DataFrame(list_communes)
@@ -43,8 +42,10 @@ def fetch_communes_metadata():
     return df
 
 def fetch_maisons_ban(code_insee, nom_commune):
-    """Récupère toutes les adresses d'une commune via l'API Base Adresse Nationale"""
+    """Récupère toutes les adresses d'une commune via l'API BAN (Filtre élargi)"""
     print(f"⏳ Extraction des adresses BAN pour {nom_commune}...")
+    
+    # Requête directe par code commune pour tout récupérer d'un coup
     url = f"https://api-adresse.data.gouv.fr/search/?q={nom_commune}&citycode={code_insee}&limit=1000"
     res = requests.get(url)
     
@@ -55,8 +56,8 @@ def fetch_maisons_ban(code_insee, nom_commune):
             props = f.get("properties", {})
             geom = f.get("geometry", {})
             
-            # Filtre pour exclure les noms de rues seules et garder les adresses précises
-            if props.get("type") == "housenumber":
+            # FILTRE CORRIGÉ : On accepte housenumber, street ET locality (lieux-dits)
+            if props.get("type") in ["housenumber", "street", "locality"]:
                 coords = geom.get("coordinates", [0, 0])
                 maisons.append({
                     "id_ban": props.get("id"),
@@ -65,20 +66,18 @@ def fetch_maisons_ban(code_insee, nom_commune):
                     "code_post": props.get("postcode"),
                     "lon": coords[0],
                     "lat": coords[1],
-                    # Valeurs par défaut enrichies ensuite par l'ADEME/Score
+                    "type_adresse": props.get("type"),
                     "type_batiment": "Maison Individuelle",
-                    "annee_construction": 1988,  # Estimation moyenne
-                    "surface_m2": 110,           # Estimation moyenne
-                    "type_chauffage_probable": "fioul" # Hypothèse haute Bauges
+                    "annee_construction": 1988,
+                    "surface_m2": 110,
+                    "type_chauffage_probable": "fioul"
                 })
                 
     return maisons
 
 def run_pipeline():
-    # 1. Mise à jour des communes
     fetch_communes_metadata()
     
-    # 2. Récupération des maisons pour toutes les communes
     all_maisons = []
     for c in COMMUNES_BAUGES:
         maisons = fetch_maisons_ban(c["code_insee"], c["nom"])
