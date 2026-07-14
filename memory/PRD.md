@@ -1,47 +1,59 @@
-# BBD – Prospect Intelligence V1
+# BBD – Prospect Intelligence
 
 ## Problem Statement
-Créer un **moteur intelligent de détection de prospects géographiques** pour la vente de pompes à chaleur air-eau (BAR-TH-171) dans le **Massif des Bauges**. Le logiciel n'est pas un CRM, c'est un moteur de renseignement commercial. Il doit répondre à une seule question : *"Quelles sont les meilleures communes à visiter en priorité ?"*
+Créer un **moteur intelligent de détection de prospects géographiques** pour la vente de pompes à chaleur air-eau (BAR-TH-171) dans le **Massif des Bauges**. Le logiciel n'est pas un CRM, c'est un moteur de renseignement commercial. Il doit répondre à une seule question : *"Quelles sont les meilleures maisons à visiter en priorité dans cette commune ?"*
 
-Opération immédiate : préparer la tournée d'août du commercial Gaël (Services Energy 69). Modèle : BBD détecte → qualifie → classe → transmet. Gaël vend. Commission partagée.
+Opération immédiate : préparer la tournée d'août du commercial Gaël (Services Energy 69). BBD détecte → qualifie → classe → transmet. Gaël vend. Commission partagée.
 
 ## User Personas
-- **BBD (owner)** — prépare et priorise les dossiers en amont.
-- **Gaël (commercial terrain)** — reçoit les communes triées, ne perd pas de temps à qualifier.
+- **BBD (owner)** — prépare et priorise les dossiers en amont, orchestre la campagne.
+- **Gaël (commercial terrain)** — reçoit les prospects triés, ne perd pas de temps à qualifier.
 
 ## Architecture
-- **Backend** : FastAPI + MongoDB, endpoints /api/*
+- **Backend** : FastAPI + MongoDB + httpx (Overpass), endpoints `/api/*`
 - **Frontend** : React 19 + Tailwind + shadcn/ui + react-leaflet (dark CartoDB tiles)
-- **IA** : Claude Sonnet 4.5 via clé Emergent universelle (EMERGENT_LLM_KEY)
-- **Design** : dark command-center, IBM Plex Sans/Mono, grid borders, score badges couleur
+- **IA** : Claude Sonnet 4.5 via clé Emergent universelle
+- **Données externes** : Overpass API (OSM/cadastre DGI) pour les footprints de bâtiments
+- **Design** : dark command-center, IBM Plex Sans/Mono, grid borders
 
-## What's Implemented (Phase 1 — 14/02/2026)
-1. **Base géographique** : 25 communes réelles du Massif des Bauges (< 2500 hab), avec population, logements, maisons individuelles, revenu médian, altitude, GPS, zone climatique H1 (fichier `backend/bauges_data.py`).
-2. **Moteur de scoring BBD** (`backend/scoring.py`) : score /100 pondéré sur 5 critères — ancienneté du parc (30%), part maisons individuelles (20%), volume (20%), revenu médian (20%), climat H1 (10%). Calcule aussi les dossiers BAR-TH-171 estimés.
-3. **Dashboard** (`frontend/src/pages/Dashboard.jsx`) : 4 KPIs, carte react-leaflet interactive avec cercles colorés par score, table triable/filtrable des 25 communes avec recherche et slider score-min.
-4. **Fiche commune détaillée** (`CommuneDetail.jsx`) : 3 cartes de données, décomposition du score critère par critère, **commentaire IA Claude Sonnet 4.5** avec cache MongoDB, lien Google Maps.
-5. Endpoints backend : `/api/communes` (list + tri + filter), `/api/communes/{code}` (détail + rank), `/api/stats`, `/api/communes/{code}/ai-comment`, `/api/seed`.
+## What's Implemented
 
-Testing agent : **100% pass** backend + frontend.
+### Phase 1 (14/02/2026) — Niveau COMMUNE
+1. Base de 25 communes réelles du Massif des Bauges < 2 500 hab (Savoie + Haute-Savoie), enrichies (population, logements, revenu médian, altitude, GPS, zone H1)
+2. Moteur de scoring communal `/100` pondéré (ancienneté 30%, maisons indiv. 20%, volume 20%, revenu 20%, climat 10%)
+3. Dashboard dark command-center : 4 KPIs, carte react-leaflet, table classement 25 communes
+4. Fiche commune détaillée avec breakdown score + **commentaire IA Claude Sonnet 4.5** (cached MongoDB)
 
-## Backlog (Phase 2)
-### P0 — Prochain sprint
-- **Module 2** : recensement maison par maison (cadastre, adresses, GPS, parcelle) via IGN/API adresse.
-- **Module 3-4** : score PAR MAISON (Module 3 : critères individuels ; Module 4 : score 0-100).
-- **Module 7** : dossier prospect avec pipeline (À analyser → À contacter → RDV → Transmis Gaël → Vendu / Perdu).
-- **Module 6** : intégration Google Maps / Street View directement dans la fiche.
+### Phase 2 (14/02/2026) — Modules 2 + 7
+5. **Module 2 — Recensement maison par maison** (`services/overpass.py`) : query Overpass API (User-Agent), filtre bâtiments 55-500 m² (plage typique maison indiv. FR), extrait footprint réel du cadastre DGI, calcule surface au sol + surface habitable estimée. Endpoint `POST /communes/{code}/discover`.
+6. **Scoring individuel maison** (`services/house_scoring.py`) : score /100 par maison basé sur type OSM (house/detached/residential/yes), surface habitable, ancienneté (start_date OSM ou fallback commune), probabilité chauffage fossile, accessibilité (adresse), zone H1.
+7. **Fiche prospect avec pipeline** (Module 7) : chaque maison a un statut (À analyser → À contacter → Intéressé → RDV → Transmis Gaël → Vendu / Perdu), notes libres, champs contact (nom/tel/email). Endpoint `PATCH /houses/{id}`.
+8. **Page Pipeline global** (`/pipeline`) : kanban 7 colonnes avec counts + tableau des prospects actifs avec lien vers leur commune.
+9. **Carte fiche commune** : leaflet zoomé sur la commune avec polygones réels de chaque maison colorés par score, clic → side panel (shadcn Sheet) avec breakdown, liens Google Maps / Street View / **IGN Orthophoto (Géoportail)**, dropdown statut, save.
+10. **KPIs enrichis** : total maisons détectées, prospects actifs.
 
-### P1
-- **Module 9** : écosystème local (commerces, artisans, associations) via SIRENE / Google Places.
-- **Module 8** : contacts (nom, tel, mail) collectés publiquement.
-- **Module 11** : tableau de bord commissions BBD / ventes.
+**Données réelles seedées** : Gruffy (500), Cusy (296), Bellecombe-en-Bauges (477) → **1 273 vraies maisons individuelles** en base, prêtes à qualifier.
+
+Testing agent : **100% pass** (backend 10/10 + frontend complet).
+
+## Backlog
+
+### P1 — Prochain sprint
+- **Feuille de route PDF quotidienne** pour Gaël (top 5 maisons du jour + itinéraire optimisé + fiches imprimables)
+- Pré-lancer automatiquement `discover` sur les 25 communes (background job) pour éviter que le user clique 25 fois
+- **Module 8** : enrichissement contacts via annuaires publics (pages jaunes, mairie), collecte semi-manuelle
+- **Module 6** : Google Street View embed (nécessite clé API + budget)
+- Export CSV du pipeline pour Gaël
 
 ### P2
-- **Module 10** : recensement des présences réseaux sociaux locales.
-- Extension multi-territoires (au-delà des Bauges).
-- Export PDF fiche commune / fiche maison pour tournée terrain.
+- **Module 9** : écosystème local (commerces, artisans, associations) via SIRENE / Google Places
+- **Module 10** : recensement présences réseaux sociaux locales (recensement uniquement, pas d'automation)
+- **Module 11** : tableau de bord commissions / ventes / ROI par commune
+- Enrichissement bâti : `start_date` réel via BD TOPO (IGN) plutôt que fallback commune
+- Extension multi-territoires au-delà des Bauges (recharger la base communale + relancer Overpass)
+- Filtres avancés (par statut, par score, par surface) sur la page pipeline
 
-## Next Action Items
-1. Valider avec l'utilisateur le classement des 25 communes livrées.
-2. Enrichir la base avec les vraies données INSEE si besoin (actuellement estimations calibrées).
-3. Attaquer Module 2 (recensement maisons) — c'est là que se joue la vraie valeur commerciale terrain.
+### P3
+- Auth multi-utilisateur (Gaël vs BBD) avec permissions
+- Notifications push quand une maison change de statut
+- Historique/journal d'activité par maison
