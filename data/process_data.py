@@ -1,25 +1,18 @@
-# data/process_data.py
+cat << 'EOF' > data/process_data.py
 import pandas as pd
 import os
-
-# Définition de la grille de scoring BBD (sur 100 points)
-# Selon les critères demandés par Benoit :
-# - Ancienneté (Avant 2000)
-# - Grande surface (> 90 m²)
-# - Type de chauffage (Fioul, Gaz)
-# - Zone climatique H1 (Bauges)
 
 def calculer_score_bbd(row):
     score = 0
     
-    # 1. Ancienneté du bâtiment (Priorité forte)
+    # 1. Ancienneté du bâtiment
     annee = row.get('annee_construction', 2005)
     if annee < 1980:
-        score += 35  # Très ancienne -> Fort potentiel de rénovation PAC
+        score += 35
     elif annee < 2000:
-        score += 25  # Ancienne
+        score += 25
     else:
-        score += 5   # Récente (Moins prioritaire)
+        score += 5
 
     # 2. Surface estimée
     surface = row.get('surface_m2', 0)
@@ -33,16 +26,15 @@ def calculer_score_bbd(row):
     # 3. Mode de chauffage probable
     chauffage = str(row.get('type_chauffage_probable', '')).lower()
     if 'fioul' in chauffage:
-        score += 30  # Cible prioritaire BAR-TH-171
+        score += 30
     elif 'gaz' in chauffage or 'charbon' in chauffage:
         score += 20
     elif 'electrique' in chauffage:
         score += 10
 
-    # 4. Zone Climatique H1 (Communes du Massif des Bauges)
+    # 4. Zone Climatique H1 (Bauges)
     score += 10
 
-    # Plafond à 100
     return min(score, 100)
 
 def process_pipeline():
@@ -58,17 +50,12 @@ def process_pipeline():
 
     print("⚡ Calcul du Score BBD pour chaque maison...")
     df['score_bbd'] = df.apply(calculer_score_bbd, axis=1)
-
-    # Ajout du statut de prospection pour Gaël (Module 7)
     df['statut'] = 'À analyser'
-
-    # Tri par score décroissant (les meilleurs prospects en premier)
     df = df.sort_values(by='score_bbd', ascending=False)
 
     os.makedirs("data/processed", exist_ok=True)
     df.to_csv(output_path, index=False)
 
-    # Statistiques rapides
     top_prospects = len(df[df['score_bbd'] >= 80])
     print(f"✅ Traitement terminé !")
     print(f"📊 Total maisons traitées : {len(df)}")
@@ -77,3 +64,4 @@ def process_pipeline():
 
 if __name__ == "__main__":
     process_pipeline()
+EOF
