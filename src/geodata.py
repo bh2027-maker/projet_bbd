@@ -35,6 +35,15 @@ def enrichir_avec_insee(df_bauges, path_insee_csv):
     
     return df_final
 
+def calculer_indice_bbd(df):
+    """
+    Calcule un score simple basé sur le nombre de logements.
+    Plus il y a de logements, plus la commune est prioritaire.
+    """
+    # Exemple : Score = (Nombre de logements) / 10
+    df['score_bbd'] = df['nb_logements'] / 10 
+    return df.sort_values(by='score_bbd', ascending=False)
+
 if __name__ == "__main__":
     data = load_communes()
     if data is not None:
