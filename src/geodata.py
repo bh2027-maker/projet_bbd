@@ -35,6 +35,15 @@ def enrichir_avec_insee(df_bauges, path_insee_csv):
     
     return df_final
 
+
+def calculer_indice_bbd(df):
+    # Si la colonne n'existe pas, on met une valeur par défaut de 100 pour éviter le crash
+    if 'nb_logements' not in df.columns:
+        df['nb_logements'] = 100 
+    
+    df['score_bbd'] = df['nb_logements'] / 10 
+    return df.sort_values(by='score_bbd', ascending=False)
+
 def calculer_indice_bbd(df):
     """
     Calcule un score simple basé sur le nombre de logements.
