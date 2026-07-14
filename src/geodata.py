@@ -45,11 +45,10 @@ def calculer_indice_bbd(df):
     return df.sort_values(by='score_bbd', ascending=False)
 
 def calculer_indice_bbd(df):
-    """
-    Calcule un score simple basé sur le nombre de logements.
-    Plus il y a de logements, plus la commune est prioritaire.
-    """
-    # Exemple : Score = (Nombre de logements) / 10
+    # Si la colonne n'existe pas, on met une valeur par défaut de 100 pour éviter le crash
+    if 'nb_logements' not in df.columns:
+        df['nb_logements'] = 100 
+    
     df['score_bbd'] = df['nb_logements'] / 10 
     return df.sort_values(by='score_bbd', ascending=False)
 
