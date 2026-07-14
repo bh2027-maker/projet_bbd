@@ -1,0 +1,36 @@
+{
+  "summary": "BBD Prospect Intelligence V1 tested end-to-end. All backend endpoints (seed, list, sort, filter, detail, 404, stats, AI comment + cache) return correct data. Frontend dashboard loads 25 rows, 4 KPIs, react-leaflet dark map with circles, search filter and slider work, row click navigates to detail page which shows score 70.2, breakdown, 3 info cards, AI comment (cached from backend), Google Maps link and back link. Claude Sonnet 4.5 via EMERGENT_LLM_KEY generates a coherent French comment in ~6s and second call is served cached=true with identical text.",
+  "tested_scope": ["backend", "frontend", "integration"],
+  "passed": [
+    "POST /api/seed -> {seeded:25} (200)",
+    "GET /api/communes returns {count:25, items:[...]} sorted by score desc, with breakdown/rank/zone_climatique=H1/lat/lon/dossiers/nb_maisons",
+    "GET /api/communes?sort=nom sorts alphabetically (Aillon-le-Jeune first)",
+    "GET /api/communes?min_score=70 returns only score>=70 (count=1, Gruffy)",
+    "GET /api/communes/74099 returns Gruffy details, score 70.2, breakdown present",
+    "GET /api/communes/00000 returns HTTP 404",
+    "GET /api/stats returns nb_communes=25, nb_score_sup_70=1, nb_score_sup_80=0, score_moyen=63.4, total_maisons_individuelles=6445, total_dossiers_estimes=2411, top_commune=Gruffy",
+    "POST /api/communes/74099/ai-comment: first call cached=false (~6s, Claude Sonnet 4.5, French, 2-3 sentences), second call cached=true with identical text",
+    "Dashboard: 4 KPIs render (kpi-communes=25, kpi-prioritaires=1, kpi-maisons=6445, kpi-dossiers=2411)",
+    "communes-map visible, table has 25 row-{code_insee} rows",
+    "search-input 'Gruffy' filters to 1 row",
+    "minscore-slider present",
+    "Row click navigates to /communes/74099",
+    "commune-detail-main, score-breakdown, ai-comment-block, gmaps-link visible",
+    "ai-comment-text displays 497-char comment (auto-loaded from cache)",
+    "back-link returns to dashboard /"
+  ],
+  "failed": [
+    {
+      "area": "backend/frontend detail page",
+      "issue": "GET /api/communes/{code} does not return 'rank' field (only computed in list endpoint). Frontend detail page consequently shows 'RANG #—'.",
+      "evidence": "curl /api/communes/74099 -> has_rank=False; UI shows 'RANG #—' on Gruffy detail",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "Optional: compute and include 'rank' in GET /api/communes/{code_insee} response so the detail page shows the correct rank instead of '#—' (already flagged as non-blocking by main agent)."
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true
+}
