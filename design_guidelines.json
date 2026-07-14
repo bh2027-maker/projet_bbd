@@ -1,0 +1,119 @@
+{
+  "theme": "Dark Mode (Command Center)",
+  "typography": {
+    "headings": {
+      "font_family": "IBM Plex Sans",
+      "weights": ["400", "600"],
+      "classes": "font-sans tracking-tight"
+    },
+    "body": {
+      "font_family": "Inter",
+      "weights": ["400", "500"],
+      "classes": "font-sans leading-relaxed"
+    },
+    "data_numbers": {
+      "font_family": "IBM Plex Mono",
+      "weights": ["500", "700"],
+      "classes": "font-mono tracking-tighter"
+    }
+  },
+  "colors": {
+    "background": {
+      "main": "#0B0F19",
+      "card": "#111827",
+      "card_hover": "#1F2937"
+    },
+    "text": {
+      "primary": "#F3F4F6",
+      "secondary": "#9CA3AF",
+      "muted": "#6B7280"
+    },
+    "brand_accents": {
+      "alpine_emerald": "#10B981", 
+      "intelligence_blue": "#3B82F6",
+      "alert_amber": "#F59E0B"
+    },
+    "score_scale": {
+      "high": "#10B981",
+      "medium": "#F59E0B",
+      "low": "#EF4444"
+    }
+  },
+  "layouts": {
+    "page_structure": "Bento Grid Protocol (High Density Grid for Dashboards). Strict grid hierarchy, dense and compact spacing.",
+    "containers": "Go for 'Grid Borders (The Technical Look)' - exposing the skeleton. Containers should have 1px solid borders border-slate-800, flat background bg-slate-900, no shadow. Max 4px border radius for a sharp, serious look."
+  },
+  "components": {
+    "cards": "Flat background, 1px subtle border, no shadow. Hover: slight lift, border color darkens/lightens. Use Grid Borders to separate sections.",
+    "tables": "Shadcn Table component. High density. Monospace fonts for numbers (population, altitude, score). Sticky header.",
+    "map": "Interactive map taking prominent space. Dark themed map tiles (e.g., CartoDB Dark Matter or similar via react-leaflet). Communes highlighted using choropleth style based on BBD Score.",
+    "score_badge": "Monospace typography, color-coded by score_scale, solid background with 10% opacity of the accent color + 1px border of the accent color.",
+    "kpi_widgets": "Large numerical values in IBM Plex Mono. Subtle sparkline chart or progress bar below."
+  },
+  "visual_enhancers": {
+    "borders": "1px solid #1E293B. Hover states use #334155.",
+    "glassmorphism": "Used ONLY for sticky headers or floating overlays (modals). bg-black/60 with backdrop-blur-xl and 1px border-white/10.",
+    "textures": "Subtle noise on the main background to prevent flat 'dead' space."
+  },
+  "motion": {
+    "transitions": "Fast, precise, no bouncy animations. Use transition: transform 0.2s ease, opacity 0.2s ease. No 'transition: all'.",
+    "hover": "Explicit hover states on table rows (bg-slate-800/50), clickable cards (border-slate-600)."
+  },
+  "creative_libraries": [
+    {
+      "name": "react-leaflet",
+      "purpose": "Interactive map of Massif des Bauges. Requires 'leaflet' and 'react-leaflet'.",
+      "instructions": "Use CartoDB Dark Matter tiles (url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') for a sleek intelligence-engine look."
+    },
+    {
+      "name": "recharts",
+      "purpose": "Data visualization for KPI sparklines and score breakdown radar/bar charts."
+    },
+    {
+      "name": "lucide-react",
+      "purpose": "Icons. Use thin/regular strokes."
+    }
+  ],
+  "image_urls": {
+    "avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzF8MHwxfHNlYXJjaHwyfHxwcm9mZXNzaW9uYWwlMjBtYW4lMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODQwNDg5NTN8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Professional internal user avatar (Gaël)",
+        "category": "user_profile"
+      }
+    ],
+    "backgrounds": [
+      {
+        "url": "https://images.unsplash.com/photo-1597407068889-782ba11fb621?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwxfHxmcmVuY2glMjBhbHBzJTIwbW91bnRhaW5zJTIwZGFya3xlbnwwfHx8fDE3ODQwNDg5NDd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Dark moody French Alps texture. Use as a very low opacity (5%) background texture or login screen background if needed.",
+        "category": "texture"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "You MUST use dark theme. Add text-slate-200 and bg-[#0B0F19] to the root body or main app container.",
+    "You MUST NOT center align the app container, do not add '.App { text-align: center; }'.",
+    "Use strict grid layouts (Grid Borders style) for the dashboard. Keep it dense and data-heavy.",
+    "Use 'react-leaflet' for the interactive map. The map should be a central element of the dashboard, colored by commune score.",
+    "Add 'data-testid' to all interactive elements.",
+    "For the Commune detail view (Fiche commune), include a section for 'Commentaire IA' styled distinctively (e.g., slight blue/emerald tint background with a sparkle icon) to justify the score.",
+    "Include KPIs: Nb communes analysées, Nb communes score > 70, Potentiel total estimé.",
+    "Do NOT use transparent backgrounds for dropdowns/selects. Always use solid dark background (bg-slate-900).",
+    "Install required fonts from Google Fonts: IBM Plex Sans and IBM Plex Mono."
+  ],
+  "accessibility": {
+    "contrast": "Ensure APCA/WCAG AA contrast for text over dark backgrounds. Avoid gray-on-gray.",
+    "focus": "Use explicit focus rings focus:ring-2 focus:ring-emerald-500 focus:outline-none."
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not use generic centered layouts or simplistic gradients.",
+    "Create depth through layered design elements with z-index hierarchy and subtle 1px borders.",
+    "Never apply universal transition: all. Use specific transition properties.",
+    "Use modern button styles relevant to the app style.",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions.",
+    "Use sonner for toasts.",
+    "Prioritize using pre-existing components from src/components/ui.",
+    "DO NOT use placeholder image URLs. Use the provided image_urls."
+  ]
+}
