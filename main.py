@@ -1,18 +1,12 @@
-# main.py
-
-# Vous devez importer vos fonctions depuis votre dossier src
-from src.geodata import load_communes, enrichir_avec_insee
-import os
+from src.geodata import load_communes, calculer_indice_bbd
 
 def main():
-    # 1. Charger la liste
-    df_bauges = load_communes()
-    
-    if df_bauges is not None:
-        print("Chargement réussi.")
-        # ... suite de votre logique
-    else:
-        print("Échec du chargement.")
+    df = load_communes()
+    if df is not None:
+        # Calculer le score et trier
+        df_classe = calculer_indice_bbd(df)
+        print("Classement des communes par potentiel BBD :")
+        print(df_classe[['nom_commune', 'score_bbd']])
 
 if __name__ == "__main__":
     main()
