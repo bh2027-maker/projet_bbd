@@ -2,7 +2,6 @@
 import requests
 import pandas as pd
 import os
-import io
 
 COMMUNES_BAUGES = [
     {"nom": "Bellecombe-en-Bauges", "code_insee": "73039", "code_postal": "73340"},
@@ -42,73 +41,56 @@ def fetch_communes_metadata():
     print(f"✅ {len(df)} communes sauvegardées dans data/raw/bauges_communes.csv")
     return df
 
-def fetch_adresses_commune_bal(code_insee, nom_commune):
-    """Télécharge l'intégralité du fichier d'adresses BAL pour une commune"""
-    print(f"⏳ Extraction des adresses complètes pour {nom_commune}...")
+def fetch_adresses_commune(code_insee, nom_commune):
+    """Récupère les adresses en interrogeant l'API Adresse officielle"""
+    print(f"⏳ Extraction des adresses pour {nom_commune}...")
     
-    # URL de téléchargement direct de la Base Adresse Locale de la commune
-    url = f"https://ban-ingestion.api.gouv.fr/communes/{code_insee}/download/csv-bal"
-    res = requests.get(url)
+    # Étape 1 : Récupérer les rues et lieux-dits de la commune
+    url_streets = f"https://api-adresse.data.gouv.fr/search/?q={nom_commune}&citycode={code_insee}&type=street&limit=100"
+    res_streets = requests.get(url_streets)
     
-    maisons = []
-    if res.status_code == 200:
-        # Lire le CSV retourné par l'API
-        csv_data = io.StringIO(res.text)
-        df_bal = pd.read_csv(csv_data, sep=';', dtype=str)
+    voies = [nom_commune]
+    if res_streets.status_code == 200:
+        for feat in res_streets.json().get("features", []):
+            label = feat.get("properties", {}).get("name")
+            if label:
+                voies.append(f"{label} {nom_commune}")
+
+    # Étape 2 : Récupérer toutes les adresses associées
+    maisons = {}
+    for query in voies[:15]:  # Sélection des voies principales
+        url_add = f"https://api-adresse.data.gouv.fr/search/?q={query}&citycode={code_insee}&limit=100"
+        res_add = requests.get(url_add)
         
-        for _, row in df_bal.iterrows():
-            numero = str(row.get('numero', '')).strip()
-            nom_voie = str(row.get('nom_voie', '')).strip()
-            
-            # Formater l'adresse complète
-            adresse_complete = f"{numero} {nom_voie}".strip() if numero and numero != 'nan' else nom_voie
-            
-            lat = row.get('lat')
-            lon = row.get('long') or row.get('lon')
-            
-            if lat and lon:
-                maisons.append({
-                    "id_ban": row.get('cle_interop'),
-                    "adresse": f"{adresse_complete}, {nom_commune}",
-                    "nom_commune": nom_commune,
-                    "code_post": row.get('code_postal'),
-                    "lon": float(lon),
-                    "lat": float(lat),
-                    "type_batiment": "Maison Individuelle",
-                    "annee_construction": 1988,  # Valeur par défaut pour le scoring
-                    "surface_m2": 110,           # Valeur par défaut pour le scoring
-                    "type_chauffage_probable": "fioul"
-                })
-    else:
-        # Fallback si pas de BAL directe : requête générique adresse.data.gouv.fr
-        fallback_url = f"https://api-adresse.data.gouv.fr/search/?q={nom_commune}&limit=100"
-        res_fb = requests.get(fallback_url)
-        if res_fb.status_code == 200:
-            for f in res_fb.json().get("features", []):
+        if res_add.status_code == 200:
+            for f in res_add.json().get("features", []):
                 props = f.get("properties", {})
                 geom = f.get("geometry", {})
-                coords = geom.get("coordinates", [0, 0])
-                maisons.append({
-                    "id_ban": props.get("id"),
-                    "adresse": props.get("label"),
-                    "nom_commune": nom_commune,
-                    "code_post": props.get("postcode"),
-                    "lon": coords[0],
-                    "lat": coords[1],
-                    "type_batiment": "Maison Individuelle",
-                    "annee_construction": 1988,
-                    "surface_m2": 110,
-                    "type_chauffage_probable": "fioul"
-                })
+                ban_id = props.get("id")
                 
-    return maisons
+                if ban_id and ban_id not in maisons:
+                    coords = geom.get("coordinates", [0, 0])
+                    maisons[ban_id] = {
+                        "id_ban": ban_id,
+                        "adresse": props.get("label"),
+                        "nom_commune": nom_commune,
+                        "code_post": props.get("postcode"),
+                        "lon": coords[0],
+                        "lat": coords[1],
+                        "type_batiment": "Maison Individuelle",
+                        "annee_construction": 1988,
+                        "surface_m2": 110,
+                        "type_chauffage_probable": "fioul"
+                    }
+                    
+    return list(maisons.values())
 
 def run_pipeline():
     fetch_communes_metadata()
     
     all_maisons = []
     for c in COMMUNES_BAUGES:
-        maisons = fetch_adresses_commune_bal(c["code_insee"], c["nom"])
+        maisons = fetch_adresses_commune(c["code_insee"], c["nom"])
         all_maisons.extend(maisons)
         
     df_maisons = pd.DataFrame(all_maisons)
