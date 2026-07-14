@@ -1,19 +1,25 @@
 """BBD Prospect Intelligence – Backend FastAPI."""
 from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import io
+import asyncio
 import logging
 from pathlib import Path
 from datetime import datetime, timezone
 from pydantic import BaseModel
+from typing import List
 
-from bauges_data import BAUGES_COMMUNES
+from bauges_data import load_bauges
 from scoring import enrichir_commune
 from ai_service import generate_commune_comment
 from services.overpass import fetch_buildings
 from services.house_scoring import score_maison, STATUSES, STATUS_LABELS
+from services.annuaire import fetch_mairie
+from services.pdf_tour import build_tour_pdf
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -33,7 +39,7 @@ async def _seed_if_empty():
     if count > 0:
         return count
     docs = []
-    for c in BAUGES_COMMUNES:
+    for c in load_bauges():
         enriched = enrichir_commune(c)
         enriched["seeded_at"] = datetime.now(timezone.utc).isoformat()
         docs.append(enriched)
@@ -264,7 +270,141 @@ async def pipeline_overview():
     }
 
 
+# ---------- Module 8 : contacts locaux (mairie) ----------
+@api_router.get("/communes/{code_insee}/mairie")
+async def get_mairie(code_insee: str):
+    """Retourne les coordonnées de la mairie (avec cache MongoDB)."""
+    commune = await db.communes.find_one({"code_insee": code_insee})
+    if not commune:
+        raise HTTPException(404, "Commune introuvable")
+    if commune.get("mairie"):
+        return commune["mairie"]
+    try:
+        m = await fetch_mairie(code_insee)
+    except Exception as e:  # noqa
+        raise HTTPException(502, f"API annuaire indisponible : {e}")
+    if m:
+        await db.communes.update_one({"code_insee": code_insee}, {"$set": {"mairie": m}})
+    return m or {}
+
+
+# ---------- Discover all (Module 2 en masse) ----------
+@api_router.post("/discovery/start")
+async def trigger_discover_all():
+    """Lance la détection en arrière-plan pour toutes les communes sans maisons."""
+    if _discovery_state["running"]:
+        return {"status": "already_running", "progress": _discovery_state}
+    asyncio.create_task(_run_discover_all())
+    await asyncio.sleep(0.2)
+    return {"status": "started", "progress": _discovery_state}
+
+
+@api_router.get("/discovery/status")
+async def discovery_status():
+    return _discovery_state
+
+
+# ---------- Feuille de route PDF (Module 7 bis) ----------
+class TourRequest(BaseModel):
+    house_ids: List[str]
+    date: str | None = None
+    label: str | None = None
+
+
+@api_router.post("/tour/pdf")
+async def tour_pdf(payload: TourRequest):
+    """Génère un PDF de feuille de route pour Gaël à partir d'une liste de maisons."""
+    if not payload.house_ids:
+        raise HTTPException(400, "Aucune maison sélectionnée")
+    if len(payload.house_ids) > 25:
+        raise HTTPException(400, "Maximum 25 maisons par feuille de route")
+
+    houses = []
+    async for d in db.maisons.find({"id": {"$in": payload.house_ids}}):
+        d.pop("_id", None)
+        houses.append(d)
+    if not houses:
+        raise HTTPException(404, "Aucune maison trouvée pour ces IDs")
+
+    # Preserve requested order? — we optimize inside build_tour_pdf
+    pdf_bytes = build_tour_pdf(houses, {
+        "date": payload.date or datetime.now().strftime("%d/%m/%Y"),
+        "label": payload.label,
+    })
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="feuille-de-route-BBD-{datetime.now().strftime("%Y%m%d")}.pdf"'
+        },
+    )
+
+
 app.include_router(api_router)
+_discovery_state = {
+    "running": False,
+    "total": 0,
+    "done": 0,
+    "current": None,
+    "results": [],
+    "started_at": None,
+    "finished_at": None,
+}
+
+
+async def _run_discover_all():
+    _discovery_state["running"] = True
+    _discovery_state["started_at"] = datetime.now(timezone.utc).isoformat()
+    _discovery_state["results"] = []
+    to_do = [d async for d in db.communes.find({}, {"code_insee": 1, "nom": 1})]
+    # Only communes without maisons yet
+    todo_filtered = []
+    for c in to_do:
+        cnt = await db.maisons.count_documents({"code_insee": c["code_insee"]})
+        if cnt == 0:
+            todo_filtered.append(c)
+    _discovery_state["total"] = len(todo_filtered)
+    _discovery_state["done"] = 0
+
+    for c in todo_filtered:
+        _discovery_state["current"] = c["nom"]
+        try:
+            commune = await db.communes.find_one({"code_insee": c["code_insee"]})
+            commune = _clean(dict(commune))
+            buildings = await fetch_buildings(c["code_insee"], limit=500)
+            docs = []
+            for b in buildings:
+                scoring_res = score_maison(b, commune)
+                doc = {
+                    **b, **scoring_res,
+                    "code_insee": c["code_insee"],
+                    "commune_nom": c["nom"],
+                    "status": "a_analyser",
+                    "notes": "",
+                    "contact_nom": None,
+                    "contact_tel": None,
+                    "contact_email": None,
+                    "discovered_at": datetime.now(timezone.utc).isoformat(),
+                    "id": f"{c['code_insee']}-{b['osm_id']}",
+                }
+                docs.append(doc)
+            if docs:
+                await db.maisons.insert_many(docs)
+            _discovery_state["results"].append({
+                "code_insee": c["code_insee"], "nom": c["nom"],
+                "maisons": len(docs), "ok": True,
+            })
+        except Exception as e:  # noqa
+            _discovery_state["results"].append({
+                "code_insee": c["code_insee"], "nom": c["nom"],
+                "maisons": 0, "ok": False, "error": str(e)[:150],
+            })
+        _discovery_state["done"] += 1
+        await asyncio.sleep(0.5)  # be nice to Overpass
+
+    _discovery_state["current"] = None
+    _discovery_state["running"] = False
+    _discovery_state["finished_at"] = datetime.now(timezone.utc).isoformat()
 
 app.add_middleware(
     CORSMiddleware,

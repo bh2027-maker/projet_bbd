@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchCommunes, fetchStats, scoreLabel } from "../lib/api";
 import Header from "../components/Header";
 import { ScoreBadge, KpiCard } from "../components/Widgets";
 import CommuneMap from "../components/CommuneMap";
+import DiscoverAllButton from "../components/DiscoverAllButton";
 import { Search, TrendingUp, Home as HomeIcon, Target, Map as MapIcon } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
@@ -16,20 +17,19 @@ export default function Dashboard() {
   const [query, setQuery] = useState("");
   const [minScore, setMinScore] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [c, s] = await Promise.all([fetchCommunes(), fetchStats()]);
-        setCommunes(c.items || []);
-        setStats(s);
-      } catch (e) {
-        toast.error("Erreur chargement des données");
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const load = useCallback(async () => {
+    try {
+      const [c, s] = await Promise.all([fetchCommunes(), fetchStats()]);
+      setCommunes(c.items || []);
+      setStats(s);
+    } catch (e) {
+      toast.error("Erreur chargement des données");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     return communes
@@ -89,6 +89,11 @@ export default function Dashboard() {
               hint="BAR-TH-171 CEE" />
           </div>
         )}
+
+        {/* Discover All (Module 2 en masse) */}
+        <div className="mb-6" data-testid="discover-all-wrap">
+          <DiscoverAllButton onRefresh={load} />
+        </div>
 
         {/* Carte */}
         <div className="mb-8">

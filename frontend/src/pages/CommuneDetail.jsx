@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import { ScoreBadge } from "../components/Widgets";
 import HousesMap from "../components/HousesMap";
 import HouseSheet from "../components/HouseSheet";
+import MairieCard from "../components/MairieCard";
 import { ArrowLeft, Sparkles, Mountain, Home as HomeIcon, Euro, Calendar,
          MapPin, Loader2, ExternalLink, Radar, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -174,6 +175,11 @@ export default function CommuneDetail() {
               <Row label="Statut" value={<span className="text-amber-400">À prospecter</span>} />
             </div>
           </div>
+        </div>
+
+        {/* Mairie (Module 8) */}
+        <div className="mb-8">
+          <MairieCard codeInsee={codeInsee} />
         </div>
 
         {/* Breakdown score */}

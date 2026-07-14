@@ -1,0 +1,202 @@
+{
+  "Arith": {
+    "code_insee": "73020",
+    "code_postal": "73340",
+    "departement": "73",
+    "population": 456,
+    "lon": 6.0613,
+    "lat": 45.7238
+  },
+  "Aillon-le-Jeune": {
+    "code_insee": "73004",
+    "code_postal": "73340",
+    "departement": "73",
+    "population": 430,
+    "lon": 6.0863,
+    "lat": 45.6032
+  },
+  "Aillon-le-Vieux": {
+    "code_insee": "73005",
+    "code_postal": "73340",
+    "departement": "73",
+    "population": 221,
+    "lon": 6.0797,
+    "lat": 45.6529
+  },
+  "Bellecombe-en-Bauges": {
+    "code_insee": "73036",
+    "code_postal": "73340",
+    "departement": "73",
+    "population": 793,
+    "lon": 6.1452,
+    "lat": 45.7368
+  },
+  "Le Châtelard": {
+    "code_insee": "73081",
+    "code_postal": "73630",
+    "departement": "73",
+    "population": 686,
+    "lon": 6.1252,
+    "lat": 45.6839
+  },
+  "La Chapelle-Blanche": {
+    "code_insee": "73075",
+    "code_postal": "73110",
+    "departement": "73",
+    "population": 596,
+    "lon": 6.0731,
+    "lat": 45.4499
+  },
+  "La Compôte": {
+    "code_insee": "73090",
+    "code_postal": "73630",
+    "departement": "73",
+    "population": 273,
+    "lon": 6.1453,
+    "lat": 45.6604
+  },
+  "Doucy-en-Bauges": {
+    "code_insee": "73101",
+    "code_postal": "73630",
+    "departement": "73",
+    "population": 94,
+    "lon": 6.1761,
+    "lat": 45.6971
+  },
+  "Les Déserts": {
+    "code_insee": "73098",
+    "code_postal": "73230",
+    "departement": "73",
+    "population": 845,
+    "lon": 5.9987,
+    "lat": 45.6439
+  },
+  "Jarsy": {
+    "code_insee": "73139",
+    "code_postal": "73630",
+    "departement": "73",
+    "population": 255,
+    "lon": 6.2106,
+    "lat": 45.6728
+  },
+  "Lescheraines": {
+    "code_insee": "73146",
+    "code_postal": "73340",
+    "departement": "73",
+    "population": 803,
+    "lon": 6.1069,
+    "lat": 45.7082
+  },
+  "La Motte-en-Bauges": {
+    "code_insee": "73178",
+    "code_postal": "73340",
+    "departement": "73",
+    "population": 539,
+    "lon": 6.1304,
+    "lat": 45.7113
+  },
+  "École": {
+    "code_insee": "73106",
+    "code_postal": "73630",
+    "departement": "73",
+    "population": 305,
+    "lon": 6.1816,
+    "lat": 45.6276
+  },
+  "Sainte-Reine": {
+    "code_insee": "73277",
+    "code_postal": "73630",
+    "departement": "73",
+    "population": 177,
+    "lon": 6.1444,
+    "lat": 45.6085
+  },
+  "Saint-François-de-Sales": {
+    "code_insee": "73234",
+    "code_postal": "73340",
+    "departement": "73",
+    "population": 190,
+    "lon": 6.0411,
+    "lat": 45.6765
+  },
+  "Le Noyer": {
+    "code_insee": "73192",
+    "code_postal": "73340",
+    "departement": "73",
+    "population": 230,
+    "lon": 6.0541,
+    "lat": 45.6681
+  },
+  "Allèves": {
+    "code_insee": "74004",
+    "code_postal": "74540",
+    "departement": "74",
+    "population": 397,
+    "lon": 6.082,
+    "lat": 45.7539
+  },
+  "Cusy": {
+    "code_insee": "74097",
+    "code_postal": "74540",
+    "departement": "74",
+    "population": 1842,
+    "lon": 6.0436,
+    "lat": 45.7612
+  },
+  "Gruffy": {
+    "code_insee": "74138",
+    "code_postal": "74540",
+    "departement": "74",
+    "population": 1504,
+    "lon": 6.0643,
+    "lat": 45.781
+  },
+  "Leschaux": {
+    "code_insee": "74148",
+    "code_postal": "74320",
+    "departement": "74",
+    "population": 328,
+    "lon": 6.1173,
+    "lat": 45.7736
+  },
+  "Quintal": {
+    "code_insee": "74219",
+    "code_postal": "74600",
+    "departement": "74",
+    "population": 1257,
+    "lon": 6.0911,
+    "lat": 45.8321
+  },
+  "Saint-Eustache": {
+    "code_insee": "74232",
+    "code_postal": "74410",
+    "departement": "74",
+    "population": 496,
+    "lon": 6.1439,
+    "lat": 45.7952
+  },
+  "Mûres": {
+    "code_insee": "74194",
+    "code_postal": "74540",
+    "departement": "74",
+    "population": 870,
+    "lon": 6.0391,
+    "lat": 45.8074
+  },
+  "Viuz-la-Chiésaz": {
+    "code_insee": "74310",
+    "code_postal": "74540",
+    "departement": "74",
+    "population": 1351,
+    "lon": 6.0771,
+    "lat": 45.8125
+  },
+  "Héry-sur-Alby": {
+    "code_insee": "74142",
+    "code_postal": "74540",
+    "departement": "74",
+    "population": 979,
+    "lon": 6.0087,
+    "lat": 45.79
+  }
+}

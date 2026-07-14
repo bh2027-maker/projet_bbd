@@ -55,6 +55,28 @@ export const fetchStatuses = async () => {
   return data;
 };
 
+export const fetchMairie = async (codeInsee) => {
+  const { data } = await api.get(`/communes/${codeInsee}/mairie`);
+  return data;
+};
+
+export const startDiscoveryAll = async () => {
+  const { data } = await api.post(`/discovery/start`);
+  return data;
+};
+
+export const fetchDiscoveryStatus = async () => {
+  const { data } = await api.get(`/discovery/status`);
+  return data;
+};
+
+export const generateTourPdf = async (houseIds, label) => {
+  const response = await api.post(`/tour/pdf`, { house_ids: houseIds, label }, {
+    responseType: "blob",
+  });
+  return response.data;
+};
+
 export const statusColor = (status) => {
   return {
     a_analyser: "bg-slate-500/15 text-slate-300 border-slate-500/30",

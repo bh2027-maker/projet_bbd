@@ -108,6 +108,12 @@ export default function HouseSheet({ house, statuses, statusLabels, onClose, onU
             <ExtLink href={gmaps} testid="link-gmaps">Google Maps</ExtLink>
             <ExtLink href={streetView} testid="link-streetview">Street View</ExtLink>
             <ExtLink href={ign} testid="link-ign">IGN Orthophoto</ExtLink>
+            <ExtLink
+              href={`https://www.pagesjaunes.fr/pagesblanches/recherche?quoiqui=&ou=${encodeURIComponent(local.commune_nom)}`}
+              testid="link-pagesjaunes"
+            >
+              Pages Jaunes ({local.commune_nom})
+            </ExtLink>
           </div>
         </div>
 

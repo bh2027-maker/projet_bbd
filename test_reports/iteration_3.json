@@ -1,0 +1,23 @@
+{
+  "summary": "Phase 3 end-to-end validated. Backend pytest (12/12 passing): communes list=25 with correct INSEE (Gruffy=74138, Cusy=74097, Bellecombe=73036, LaMotte=73178, Doucy=73101), old wrong codes 74099/74069 absent, Gruffy details OK (pop=1504, CP=74540, lat≈45.78, lon≈6.06); mairie API returns full shape with cache identical on 2nd call, 404 on unknown INSEE; discovery/status shape valid with results list, POST discovery/start returns already_running when a background task is already active (respected running state 2/16 at test time); tour/pdf returns application/pdf %PDF-1.4 >5KB with 3 real houses (73036), empty→400, >25→400, unknown IDs→404, optimize_route()[0]==house with best score (nearest-neighbor). Frontend: dashboard shows discover-all-progress card 'Détection en cours : Doucy-en-Bauges 2/16'; commune 74138 shows mairie-card with tel:0450775100 and mailto:secretariat@mairie-gruffy.fr; HouseSheet on 73036 exposes data-testid=link-pagesjaunes → https://www.pagesjaunes.fr/pagesblanches/recherche?quoiqui=&ou=Bellecombe-en-Bauges; Pipeline page has pipeline-toolbar with 4 buttons, load-top loads 20 rows + 20 checkboxes, PDF button label updates live to 'Feuille de route PDF (3)' after 3 selections, click triggers download of feuille-de-route-BBD-2026-07-14.pdf.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase3.py",
+    "/app/test_reports/pytest/phase3_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py now 423 lines mixing routes + seeding + background task state; consider splitting routes/discovery.py and routes/tour.py.",
+    "_discovery_state is a module-level dict shared across workers; safe with single-worker uvicorn but will break under multi-worker deployment (state per worker). Persist to Mongo if scaling out.",
+    "annuaire.fetch_mairie: no retry/backoff; on transient 5xx returns None silently (endpoint then returns {}). Consider distinguishing 'no result' vs 'API down'.",
+    "pdf_tour.optimize_route sorts remaining in O(n²·log n); OK for ≤25 but flagged for future.",
+    "HouseSheet passes prop 'testid' (string) to Field/wrapper — verify it maps to data-testid attribute on the anchor (it did in this test)."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase3.py"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100%"},
+  "seed_data_creation": "None. No mutations performed. Discovery background task left running as instructed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "A discovery-all background task was in progress during testing (2/16). No duplicate discovery/start triggered. PDF download tested against 3 real houses of Bellecombe-en-Bauges (73036, 477 houses in DB). Gruffy 74138 has 0 houses (not yet discovered) — use 73036 for house-related UI tests."
+}
