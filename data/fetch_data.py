@@ -42,48 +42,46 @@ def fetch_communes_metadata():
     return df
 
 def fetch_adresses_commune(code_insee, nom_commune):
-    """Récupère les adresses en interrogeant l'API Adresse officielle"""
+    """Récupère les points adresses et lieux-dits réels de la commune"""
     print(f"⏳ Extraction des adresses pour {nom_commune}...")
+    maisons = []
     
-    # Étape 1 : Récupérer les rues et lieux-dits de la commune
-    url_streets = f"https://api-adresse.data.gouv.fr/search/?q={nom_commune}&citycode={code_insee}&type=street&limit=100"
-    res_streets = requests.get(url_streets)
+    # Mots-clés de recherche fréquents en zone rurale/montagne pour forcer le retour d'adresses
+    mots_cles = ["Route", "Rue", "Chemin", "Chef Lieu", "Villard", "Impasse", "Place", "Ham"]
     
-    voies = [nom_commune]
-    if res_streets.status_code == 200:
-        for feat in res_streets.json().get("features", []):
-            label = feat.get("properties", {}).get("name")
-            if label:
-                voies.append(f"{label} {nom_commune}")
-
-    # Étape 2 : Récupérer toutes les adresses associées
-    maisons = {}
-    for query in voies[:15]:  # Sélection des voies principales
-        url_add = f"https://api-adresse.data.gouv.fr/search/?q={query}&citycode={code_insee}&limit=100"
-        res_add = requests.get(url_add)
-        
-        if res_add.status_code == 200:
-            for f in res_add.json().get("features", []):
-                props = f.get("properties", {})
-                geom = f.get("geometry", {})
-                ban_id = props.get("id")
-                
-                if ban_id and ban_id not in maisons:
-                    coords = geom.get("coordinates", [0, 0])
-                    maisons[ban_id] = {
-                        "id_ban": ban_id,
-                        "adresse": props.get("label"),
-                        "nom_commune": nom_commune,
-                        "code_post": props.get("postcode"),
-                        "lon": coords[0],
-                        "lat": coords[1],
-                        "type_batiment": "Maison Individuelle",
-                        "annee_construction": 1988,
-                        "surface_m2": 110,
-                        "type_chauffage_probable": "fioul"
-                    }
+    seen_ids = set()
+    
+    for mc in mots_cles:
+        url = f"https://api-adresse.data.gouv.fr/search/?q={mc}&citycode={code_insee}&limit=50"
+        try:
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200:
+                features = res.json().get("features", [])
+                for f in features:
+                    props = f.get("properties", {})
+                    geom = f.get("geometry", {})
+                    ban_id = props.get("id") or props.get("label")
                     
-    return list(maisons.values())
+                    if ban_id and ban_id not in seen_ids:
+                        seen_ids.add(ban_id)
+                        coords = geom.get("coordinates", [0, 0])
+                        maisons.append({
+                            "id_ban": ban_id,
+                            "adresse": props.get("label"),
+                            "nom_commune": nom_commune,
+                            "code_post": props.get("postcode"),
+                            "lon": coords[0],
+                            "lat": coords[1],
+                            "type_batiment": "Maison Individuelle",
+                            "annee_construction": 1988,  # Par défaut avant 2000 pour éligibilité
+                            "surface_m2": 115,           # Estimation > 90m2
+                            "type_chauffage_probable": "fioul"
+                        })
+        except Exception as e:
+            print(f"⚠️ Erreur requete {mc} pour {nom_commune}: {e}")
+            
+    print(f"  ➜ {len(maisons)} adresses trouvées pour {nom_commune}")
+    return maisons
 
 def run_pipeline():
     fetch_communes_metadata()
@@ -96,7 +94,7 @@ def run_pipeline():
     df_maisons = pd.DataFrame(all_maisons)
     os.makedirs("data/raw", exist_ok=True)
     df_maisons.to_csv("data/raw/maisons_raw.csv", index=False)
-    print(f"🚀 Total : {len(df_maisons)} adresses de maisons extraites !")
+    print(f"🚀 Total : {len(df_maisons)} adresses de maisons extraites dans les Bauges !")
 
 if __name__ == "__main__":
     run_pipeline()
