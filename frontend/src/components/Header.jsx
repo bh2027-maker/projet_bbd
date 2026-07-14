@@ -1,7 +1,8 @@
-import { Radar } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Radar, Layers } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
 export default function Header({ subtitle }) {
+  const loc = useLocation();
   return (
     <header
       data-testid="app-header"
@@ -21,10 +22,30 @@ export default function Header({ subtitle }) {
             </div>
           </div>
         </Link>
-        <div className="hidden md:flex items-center gap-2 text-[11px] font-mono-data text-slate-500">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          Moteur actif
-        </div>
+        <nav className="flex items-center gap-2">
+          <Link to="/"
+            data-testid="nav-communes"
+            className={`text-xs px-3 py-1.5 rounded-sm border transition-colors ${
+              loc.pathname === "/"
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                : "border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+            }`}>
+            Communes
+          </Link>
+          <Link to="/pipeline"
+            data-testid="nav-pipeline"
+            className={`text-xs px-3 py-1.5 rounded-sm border transition-colors inline-flex items-center gap-1.5 ${
+              loc.pathname === "/pipeline"
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                : "border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+            }`}>
+            <Layers className="w-3 h-3" /> Pipeline
+          </Link>
+          <div className="hidden md:flex items-center gap-2 text-[11px] font-mono-data text-slate-500 ml-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Moteur actif
+          </div>
+        </nav>
       </div>
     </header>
   );

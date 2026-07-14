@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchCommune, generateAiComment, scoreLabel } from "../lib/api";
+import { fetchCommune, generateAiComment, scoreLabel,
+         discoverHouses, fetchHouses, fetchStatuses, statusColor } from "../lib/api";
 import Header from "../components/Header";
 import { ScoreBadge } from "../components/Widgets";
-import { ArrowLeft, Sparkles, Mountain, Home as HomeIcon, Euro, Calendar, MapPin, Loader2, ExternalLink } from "lucide-react";
+import HousesMap from "../components/HousesMap";
+import HouseSheet from "../components/HouseSheet";
+import { ArrowLeft, Sparkles, Mountain, Home as HomeIcon, Euro, Calendar,
+         MapPin, Loader2, ExternalLink, Radar, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 const criteres = [
   { key: "anciennete_parc", label: "Ancienneté du parc", weight: "30%", icon: Calendar },
@@ -20,6 +25,13 @@ export default function CommuneDetail() {
   const [c, setC] = useState(null);
   const [aiComment, setAiComment] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [houses, setHouses] = useState([]);
+  const [housesLoaded, setHousesLoaded] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [houseQuery, setHouseQuery] = useState("");
+  const [statuses, setStatuses] = useState([]);
+  const [statusLabels, setStatusLabels] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -30,6 +42,15 @@ export default function CommuneDetail() {
       } catch (e) {
         toast.error("Impossible de charger la commune");
       }
+      try {
+        const { statuses: s, labels } = await fetchStatuses();
+        setStatuses(s); setStatusLabels(labels);
+      } catch {}
+      try {
+        const { items } = await fetchHouses(codeInsee);
+        setHouses(items);
+        setHousesLoaded(true);
+      } catch {}
     })();
   }, [codeInsee]);
 
@@ -45,6 +66,36 @@ export default function CommuneDetail() {
       setAiLoading(false);
     }
   };
+
+  const launchDiscovery = async () => {
+    setDiscovering(true);
+    toast.info("Détection en cours via OpenStreetMap/cadastre… (~15-30s)");
+    try {
+      const res = await discoverHouses(codeInsee);
+      toast.success(`${res.maisons_detectees} maisons détectées · top score ${res.top_score}`);
+      const { items } = await fetchHouses(codeInsee);
+      setHouses(items);
+      setHousesLoaded(true);
+    } catch (e) {
+      toast.error("Erreur détection : " + (e.response?.data?.detail || e.message));
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
+  const onHouseUpdated = (updated) => {
+    setHouses((prev) => prev.map((h) => (h.id === updated.id ? { ...h, ...updated } : h)));
+    setSelected((s) => (s && s.id === updated.id ? { ...s, ...updated } : s));
+  };
+
+  const filteredHouses = houses.filter((h) => {
+    if (!houseQuery) return true;
+    const q = houseQuery.toLowerCase();
+    return (h.contact_nom || "").toLowerCase().includes(q) ||
+           (h.notes || "").toLowerCase().includes(q) ||
+           String(h.osm_id).includes(q) ||
+           String(h.surface_habitable_estimee_m2).includes(q);
+  });
 
   if (!c) return <><Header /><div className="p-10 text-slate-500">Chargement…</div></>;
 
@@ -188,6 +239,137 @@ export default function CommuneDetail() {
         <div className="text-[11px] text-slate-600 mt-8 font-mono-data">
           Fiche générée par BBD · La prospection terrain reste sous la responsabilité du commercial.
         </div>
+
+        {/* ---------- Module 2 : recensement des maisons ---------- */}
+        <section className="mt-12" data-testid="houses-section">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Radar className="w-4 h-4 text-emerald-400" strokeWidth={1.5} />
+              <h2 className="font-display text-xl text-slate-100">
+                Recensement des maisons individuelles
+              </h2>
+              {housesLoaded && (
+                <span className="text-xs text-slate-500 ml-2 font-mono-data">
+                  {houses.length} maisons · source OSM/cadastre
+                </span>
+              )}
+            </div>
+            <Button
+              onClick={launchDiscovery}
+              disabled={discovering}
+              data-testid="discover-btn"
+              size="sm"
+              className="bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25"
+            >
+              {discovering
+                ? <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> Détection…</>
+                : houses.length > 0
+                  ? <>Relancer la détection</>
+                  : <>Lancer la détection</>}
+            </Button>
+          </div>
+
+          {!housesLoaded && (
+            <div className="bbd-card p-8 text-center text-slate-500">
+              Chargement…
+            </div>
+          )}
+
+          {housesLoaded && houses.length === 0 && !discovering && (
+            <div className="bbd-card p-8 text-center text-slate-500">
+              Aucune maison détectée pour l'instant.{" "}
+              <span className="text-slate-400">
+                Cliquez sur « Lancer la détection » pour interroger OpenStreetMap/cadastre.
+              </span>
+            </div>
+          )}
+
+          {houses.length > 0 && (
+            <>
+              {/* Carte des maisons */}
+              <div className="mb-4">
+                <HousesMap
+                  houses={houses}
+                  center={[c.lat, c.lon]}
+                  onSelect={setSelected}
+                  selectedId={selected?.id}
+                />
+              </div>
+
+              {/* Filtre + table */}
+              <div className="flex flex-col md:flex-row gap-3 mb-3">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Input
+                    data-testid="house-search"
+                    value={houseQuery}
+                    onChange={(e) => setHouseQuery(e.target.value)}
+                    placeholder="Rechercher (OSM ID, surface, nom, notes)…"
+                    className="pl-9 h-9 bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-600 w-80"
+                  />
+                </div>
+                <div className="text-xs text-slate-500 md:ml-auto self-center font-mono-data">
+                  Cliquez sur une ligne (ou un polygone sur la carte) pour ouvrir la fiche prospect
+                </div>
+              </div>
+
+              <div className="bbd-card overflow-hidden">
+                <div className="max-h-[440px] overflow-y-auto">
+                  <table className="w-full bbd-table" data-testid="houses-table">
+                    <thead className="sticky top-0">
+                      <tr>
+                        <th className="w-12">#</th>
+                        <th>Type</th>
+                        <th className="text-right">Surface hab.</th>
+                        <th className="text-right">Surface sol</th>
+                        <th>Ancienneté</th>
+                        <th className="text-right">% chauf. fossile</th>
+                        <th>Statut</th>
+                        <th className="text-right">Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredHouses.slice(0, 200).map((h) => (
+                        <tr key={h.id}
+                            data-testid={`house-row-${h.id}`}
+                            onClick={() => setSelected(h)}>
+                          <td className="font-mono-data text-slate-500">{h.rank}</td>
+                          <td>
+                            <div className="text-slate-100 text-xs">{h.type_label}</div>
+                            <div className="text-[10px] text-slate-500 font-mono-data">OSM {h.osm_id}</div>
+                          </td>
+                          <td className="text-right font-mono-data text-slate-200">{h.surface_habitable_estimee_m2} m²</td>
+                          <td className="text-right font-mono-data text-slate-400">{h.surface_sol_m2} m²</td>
+                          <td className="text-xs text-slate-400">{h.age_label}</td>
+                          <td className="text-right font-mono-data text-amber-400">{h.proba_chauffage_fossile_pct}%</td>
+                          <td>
+                            <span className={`text-[10.5px] px-2 py-0.5 rounded-sm border font-mono-data uppercase tracking-wider ${statusColor(h.status)}`}>
+                              {statusLabels[h.status] || h.status}
+                            </span>
+                          </td>
+                          <td className="text-right"><ScoreBadge score={h.score} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {filteredHouses.length > 200 && (
+                  <div className="text-xs text-slate-500 text-center py-2 border-t border-slate-800 font-mono-data">
+                    Affichage des 200 premières sur {filteredHouses.length} · affinez avec la recherche
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+
+        <HouseSheet
+          house={selected}
+          statuses={statuses}
+          statusLabels={statusLabels}
+          onClose={() => setSelected(null)}
+          onUpdated={onHouseUpdated}
+        />
       </main>
     </>
   );

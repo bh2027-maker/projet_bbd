@@ -70,17 +70,23 @@ export default function Dashboard() {
 
         {/* KPI */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" data-testid="kpi-grid">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" data-testid="kpi-grid">
             <KpiCard testid="kpi-communes" label="Communes analysées" value={stats.nb_communes}
-              hint={`Massif des Bauges · < 2 500 hab`} />
+              hint={`< 2 500 hab`} />
             <KpiCard testid="kpi-prioritaires" label="Score ≥ 70" value={stats.nb_score_sup_70}
-              hint={`${stats.nb_score_sup_80} en priorité 1 (≥80)`} />
+              hint={`${stats.nb_score_sup_80} ≥ 80`} />
             <KpiCard testid="kpi-maisons" label="Maisons individuelles"
               value={stats.total_maisons_individuelles.toLocaleString("fr-FR")}
-              hint="Parc total détecté" />
-            <KpiCard testid="kpi-dossiers" label="Dossiers BAR-TH-171 estimés"
+              hint="Estimation communale" />
+            <KpiCard testid="kpi-maisons-detectees" label="Maisons détectées"
+              value={(stats.total_maisons_detectees || 0).toLocaleString("fr-FR")}
+              hint="OSM/cadastre (Module 2)" />
+            <KpiCard testid="kpi-prospects-actifs" label="Prospects actifs"
+              value={stats.total_prospects_actifs || 0}
+              hint="Dans le pipeline" />
+            <KpiCard testid="kpi-dossiers" label="Dossiers estimés"
               value={stats.total_dossiers_estimes.toLocaleString("fr-FR")}
-              hint="Potentiel théorique CEE" />
+              hint="BAR-TH-171 CEE" />
           </div>
         )}
 

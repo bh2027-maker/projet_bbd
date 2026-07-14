@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import CommuneDetail from "./pages/CommuneDetail";
+import Pipeline from "./pages/Pipeline";
 import { Toaster } from "sonner";
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/communes/:codeInsee" element={<CommuneDetail />} />
         </Routes>
       </BrowserRouter>
