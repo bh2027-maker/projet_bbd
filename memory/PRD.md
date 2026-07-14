@@ -1,67 +1,65 @@
 # BBD – Prospect Intelligence
 
 ## Problem Statement
-Créer un **moteur intelligent de détection de prospects géographiques** pour la vente de pompes à chaleur air-eau (BAR-TH-171) dans le **Massif des Bauges**. Ce n'est pas un CRM, c'est un moteur de renseignement commercial : détecte → qualifie → classe → transmet. Question centrale : *"Quelles sont les meilleures maisons à visiter en priorité ?"*
-
-Opération immédiate : préparer la tournée d'août du commercial Gaël (Services Energy 69). Commission partagée BBD ↔ Gaël.
+Moteur intelligent de détection de prospects géographiques pour la vente de pompes à chaleur (BAR-TH-171) dans le Massif des Bauges. Non-CRM : détecte → qualifie → classe → transmet. Répond à : *"Quelles sont les meilleures maisons à visiter en priorité ?"*
 
 ## Users
-- **BBD** — orchestre la campagne, priorise, transmet
-- **Gaël** — commercial terrain qui reçoit les dossiers qualifiés
+- **BBD** — orchestre, priorise, transmet
+- **Gaël** — commercial terrain, tournée d'août
 
 ## Architecture
-- **Backend** : FastAPI + MongoDB + httpx (Overpass, annuaire.service-public) + reportlab (PDF)
-- **Frontend** : React 19 + Tailwind + shadcn/ui + react-leaflet (CartoDB dark)
-- **IA** : Claude Sonnet 4.5 via clé Emergent
-- **Sources externes** : geo.api.gouv.fr (INSEE, coords), Overpass API (footprints OSM/cadastre DGI), api-lannuaire.service-public.fr (mairies)
+- **Backend** : FastAPI + MongoDB + httpx + reportlab + emergentintegrations (Claude)
+- **Frontend** : React 19 + Tailwind + shadcn/ui + react-leaflet
+- **APIs externes** :
+  - geo.api.gouv.fr → codes INSEE, coordonnées, populations
+  - Overpass API (OSM/cadastre DGI) → footprints des bâtiments
+  - IGN BD TOPO WFS (data.geopf.fr) → dates de construction réelles, hauteurs, matériaux, logements
+  - api-lannuaire.service-public.fr → coordonnées mairies
+  - recherche-entreprises.api.gouv.fr (SIRENE) → écosystème local
+  - Emergent Universal Key → Claude Sonnet 4.5 (commentaires IA)
 
 ## What's Implemented
 
-### Phase 1 (14/02) — Niveau COMMUNE
-- Base des communes des Bauges < 2 500 hab, enrichie
-- Moteur de scoring communal `/100` pondéré
-- Dashboard + fiche commune + commentaire IA Claude
+### Phase 1 — Niveau COMMUNE
+Base 25 communes des Bauges + scoring communal + dashboard + fiche commune + commentaire IA Claude.
 
-### Phase 2 (14/02) — Modules 2 + 7
-- **Module 2** : recensement maison par maison via Overpass (filtre 55-500 m²), scoring individuel
-- **Module 7** : pipeline prospect (7 statuts) + fiche prospect avec contact/notes
-- Page /pipeline dédiée
+### Phase 2 — Modules 2 + 7
+Recensement maison par maison via Overpass, scoring individuel, pipeline prospect avec 7 statuts, side-panel HouseSheet, page /pipeline.
 
-### Phase 3 (14/02) — Modules 8 + Discovery masse + PDF
-- **Fix critique** : les 20+ codes INSEE du seed étaient faux. Refactorisé pour utiliser geo.api.gouv.fr comme source de vérité (fichier `bauges_lookup.json`)
-- **Module 8** : coordonnées mairie (nom, adresse, tél, email, site) via API annuaire.service-public.fr avec cache MongoDB
-- **Lien Pages Jaunes** pré-rempli dans la fiche prospect
-- **Discover All** : background task async qui lance Overpass sur toutes les communes sans maisons, avec suivi de progression en direct dans le dashboard
-- **Feuille de route PDF** : `POST /api/tour/pdf` génère un PDF A4 dark theme avec :
-  - Page couverture (nb prospects, distance totale, score moyen, top score, ordre de visite)
-  - Optimisation nearest-neighbor (Haversine) partant du meilleur score
-  - Une page par maison avec fiche complète, liens visuels (Google Maps, Street View, IGN), zone "Observations terrain" pour prendre des notes sur place
-- Page /pipeline transformée : mode "Top 20 (toutes communes)" + sélection multi-checkbox + bouton PDF téléchargement
+### Phase 3 — Modules 8 + Discovery masse + PDF
+Fix codes INSEE via geo.api.gouv.fr. Mairie (Module 8) avec cache. Discover All background async. Feuille de route PDF (reportlab + nearest-neighbor Haversine).
 
-Testing agent Phase 3 : **100% pass** (backend 12/12, frontend complet).
+### Phase 4 — BD TOPO + Filtres + Module 9
+- **Enrichissement BD TOPO IGN** (`services/bdtopo.py`) : matching centroïde tolérance 15m, récupère `date_d_apparition`, `hauteur`, `nombre_d_etages`, `nombre_de_logements`, `usage`, `matériaux`. Endpoint `POST /enrichment/start` + suivi progression. **Résultat en prod : 4 059 maisons matched (97%), 2 201 dates de construction réelles injectées (54%)**. Score maximum passé de 87.4 → **92.7** grâce aux vraies dates.
+- **Filtres avancés Pipeline** : par statut (multi), par commune (multi), par score min, par surface min. Compteur d'actifs dans le bouton.
+- **Export CSV** (Excel FR, séparateur `;`, BOM UTF-8) : 17 colonnes incluant contact, GPS, lien Google Maps direct, notes.
+- **Module 9 Écosystème local** (`services/sirene.py`) : 7 catégories NAF (Artisans BTP, Commerces, Restauration, Auto/moto, Bricolage/agricole, Santé, Associations). Endpoint `/communes/{code}/ecosysteme` avec cache. Card dans la fiche commune avec accordéons. **Résultat Gruffy : 39 entités locales identifiées, dont 24 artisans BTP avec noms/adresses complètes**.
 
-Résultats en production (au moment de la livraison) :
-- 25 communes seedées avec vrais codes INSEE
-- 2 000+ maisons réelles déjà détectées (discovery des 25 communes en background)
-- Top prospect détecté : maison de 178 m² à Aillon-le-Jeune, score 87.4
+Testing agent Phase 4 : **100% pass** (backend 8/8 + frontend complet).
+
+## Production state (livraison)
+- 25 communes seedées, vrais codes INSEE
+- **4 175 maisons individuelles** réelles détectées (OSM/cadastre DGI)
+- **2 201 avec dates de construction réelles** (BD TOPO IGN)
+- Top prospect : maison **258.8 m² au Châtelard, score 92.7**
+- Contacts mairies + écosystèmes locaux disponibles à la demande
 
 ## Backlog
 
 ### P1 — Prochain sprint
-- **Enrichissement bâti** : récupérer `start_date` réel via BD TOPO IGN (WFS) plutôt que fallback communal — améliore significativement le scoring anciennete
-- **Filtres avancés page Pipeline** : par statut, par commune, par surface, tri
-- **Export CSV** du pipeline (compatible Excel pour partage Gaël)
-- Persister l'état de discovery-all dans MongoDB (résiste au restart backend)
-- **Feuille de route par jour** : découper le top 20 en plusieurs journées avec plafond de distance
+- **Calcul CEE théorique par maison** dans le PDF (formule BAR-TH-171 × prix marché) → outil d'argumentation client sur le pas de porte
+- **Découpage tournée multi-journées** (feuille de route par jour avec plafond de distance)
+- **Persister état discover/enrichment dans MongoDB** (résiste au restart backend)
+- Vraies photos satellites IGN embarquées dans le PDF (WMTS ortho tiles)
 
 ### P2
-- **Module 9** : écosystème local (commerces, artisans, associations) via SIRENE / Google Places
-- **Module 6 avancé** : intégration Google Street View embed (nécessite clé API)
-- **Module 10** : recensement présences réseaux sociaux locales
-- **Module 11** : dashboard commissions BBD / ventes / ROI par commune
-- Historique/journal d'activité par maison
+- **Module 6 avancé** : Street View embed (nécessite clé Google Maps + budget)
+- **Module 10** : recensement présences réseaux sociaux (Facebook groupes, Instagram hashtags)
+- **Module 11** : dashboard commissions BBD / ROI par commune
+- **Enrichissement bâti supplémentaire** : matériaux traduits (codes IGN → mur pierre/béton, toit tuile/ardoise…)
+- Historique/journal d'activité par maison + notifications changement statut
 
 ### P3
-- Auth multi-utilisateur (BBD vs Gaël) avec permissions différentes
+- Auth multi-utilisateur (BBD vs Gaël) avec permissions
 - Extension multi-territoires au-delà des Bauges
-- Notifications push mobile pour changements de statut
+- Notifications push mobile
