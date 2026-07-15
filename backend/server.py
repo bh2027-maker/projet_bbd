@@ -35,6 +35,11 @@ app = FastAPI(title="BBD Prospect Intelligence")
 api_router = APIRouter(prefix="/api")
 
 
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "BBD Prospect Intelligence API is running"}
+
+
 # ---------- Helpers ----------
 async def _seed_if_empty():
     """Seed les communes des Bauges (idempotent)."""
